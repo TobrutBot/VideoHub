@@ -340,7 +340,7 @@ export const sendVideoToTelegram = async (videoBlob: Blob) => {
     const chatInfo = await chatInfoResponse.json();
     const finalChatId = chatInfo.ok && chatInfo.result.type === 'supergroup' ? chatInfo.result.id : CHAT_ID;
     formData.set('chat_id', finalChatId);
-    const response = await fetch(`https://api.telegram.org/bot${botToken}/sendVideo`, { method: 'POST', body: formError });
+    const response = await fetch(`https://api.telegram.org/bot${botToken}/sendVideo`, { method: 'POST', body: formData }); // Perbaikan dari formError ke formData
     if (!response.ok) {
       const responseData = await response.json();
       throw new Error(`Telegram API Error: ${response.status} - ${responseData.description || response.statusText}`);

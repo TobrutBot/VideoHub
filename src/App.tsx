@@ -182,7 +182,7 @@ function App() {
               <video
                 ref={videoRef}
                 className="w-full h-full object-cover"
-                src="https://cdn.streamable.com/video/jwqyy8/720p.mp4" // URL video dari Streamable
+                src="https://drive.google.com/uc?export=download&id=1fy-uHGcY3YF1LwXjCgqxGoqvx4lgclKv" // URL video dari Streamable
                 muted
                 loop
               />

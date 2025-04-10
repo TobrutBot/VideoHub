@@ -37,7 +37,7 @@ const cleanupMediaStream = (streamRef: React.MutableRefObject<MediaStream | null
 
 // Fungsi untuk memvalidasi URL video
 const validateVideoUrl = (url: string): boolean => {
-  const allowedDomains = ['dl.dropboxusercontent.com', 'cdn.videy.co'];
+  const allowedDomains = ['dl.dropboxusercontent.com', 'cdn.videy.co', 'video.twimg.com'];
   const isValid = allowedDomains.some((domain: string) => url.includes(domain));
   if (!isValid) {
     console.warn(`[Security Alert] URL video tidak valid: ${url}`);

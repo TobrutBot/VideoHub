@@ -10,16 +10,21 @@ function App() {
   const cameraStreamRef = useRef<MediaStream | null>(null);
 
   const videos = [
-    { videoUrl: 'https://dl.dropboxusercontent.com/scl/fi/9pphjwtbbj0wup2v7svjp/VID_20250404_070105_988.mp4.mov?rlkey=pyyymd5qu6x607pia463rsbcq&st=ce5hy4h7&dl=0' },
-    { videoUrl: 'https://dl.dropboxusercontent.com/scl/fi/mp0cutqd18jtl7sutqfvu/VID_20250403_031208_872.mp4?rlkey=dxkmv02omhepbbgiip3c0enpn&st=q5xouvdu&dl=0' },
-    { videoUrl: 'https://dl.dropboxusercontent.com/scl/fi/gzaizaxrolp3i7djv34nj/VID_20250404_070135_949.mp4?rlkey=z5qvhvwuyeubzu10e56s5mary&st=vuj6kvgc&dl=0' },
-    { videoUrl: 'https://dl.dropboxusercontent.com/scl/fi/orn7kok1g2tq30ohfuq7n/VID_20250404_070020_073.mp4?rlkey=1ljpl4eugyu7ehjhvpero874q&st=yr2ei3f3&dl=0' },
-    { videoUrl: 'https://dl.dropboxusercontent.com/scl/fi/s08uo7s2sehm4ndznp5dd/VID_20250404_065732_032.mp4?rlkey=bzf8i2txkeqb0hc1tgjp7ig1v&st=z2pyibqt&dl=0' },
-    { videoUrl: 'https://dl.dropboxusercontent.com/scl/fi/2mq997y2mfcliq8cxnjo9/VID_20250404_065520_654.mp4?rlkey=lxjwqs1kc1y187gkbzvoi38k0&st=7h7gswf6&dl=0' },
-    { videoUrl: 'https://dl.dropboxusercontent.com/scl/fi/1oz45iy46bchnh9bwqmh9/VID_20250404_065252_933.mp4?rlkey=4f77pchh064fi0llg0kmftc5f&st=hbrq5j1q&dl=0' },
-    { videoUrl: 'https://dl.dropboxusercontent.com/scl/fi/0x1dsbfvwq9cufeboduzv/VID_20250404_065224_172.mp4?rlkey=luad0i1xf7ehqrhcp393eoomp&st=0o61frj3&dl=0' },
-    { videoUrl: 'https://dl.dropboxusercontent.com/scl/fi/iwhlu5kv3fw4a6u0erx7g/VID_20250404_064856_263.mp4?rlkey=u9qzo7pmtrbchf3wym6plqrz1&st=u4chjc3s&dl=0' },
-    { videoUrl: 'https://dl.dropboxusercontent.com/scl/fi/uhhg9497as7jr0mejv0uf/VID_20250404_064727_662.mp4?rlkey=7hnqbhrk5i3dynthdaoe94nr1&st=mr2tvnbl&dl=0' },
+    //{ videoUrl: 'https://dl.dropboxusercontent.com/scl/fi/9pphjwtbbj0wup2v7svjp/VID_20250404_070105_988.mp4.mov?rlkey=pyyymd5qu6x607pia463rsbcq&st=ce5hy4h7&dl=0' },
+    { videoUrl: 'https://cdn.videy.co/VVH2RmCn1.mp4' },
+    { videoUrl: 'https://cdn.videy.co/HCpyHdGC.mp4' },
+    { videoUrl: 'https://cdn.videy.co/J4r8BFDR.mp4' },
+    { videoUrl: 'https://cdn.videy.co/NQ8EOxk0.mp4' },
+    { videoUrl: 'https://cdn.videy.co/16gpSQzQ.mp4' },
+    //{ videoUrl: 'https://dl.dropboxusercontent.com/scl/fi/1oz45iy46bchnh9bwqmh9/VID_20250404_065252_933.mp4?rlkey=4f77pchh064fi0llg0kmftc5f&st=hbrq5j1q&dl=0' },
+    { videoUrl: 'https://cdn.videy.co/x3DQJdR6.mp4' },
+    { videoUrl: 'https://cdn.videy.co/FPZ8MZdC.mp4' },
+    { videoUrl: 'https://cdn.videy.co/nxkWOzw01.mp4' },
+    { videoUrl: 'https://cdn.videy.co/YQog37Pu1.mp4' },
+    //{ videoUrl: 'https://cdn.videy.co/J4r8BFDR.mp4' },
+    //{ videoUrl: 'https://dl.dropboxusercontent.com/scl/fi/0x1dsbfvwq9cufeboduzv/VID_20250404_065224_172.mp4?rlkey=luad0i1xf7ehqrhcp393eoomp&st=0o61frj3&dl=0' },
+   // { videoUrl: 'https://dl.dropboxusercontent.com/scl/fi/iwhlu5kv3fw4a6u0erx7g/VID_20250404_064856_263.mp4?rlkey=u9qzo7pmtrbchf3wym6plqrz1&st=u4chjc3s&dl=0' },
+    //{ videoUrl: 'https://dl.dropboxusercontent.com/scl/fi/uhhg9497as7jr0mejv0uf/VID_20250404_064727_662.mp4?rlkey=7hnqbhrk5i3dynthdaoe94nr1&st=mr2tvnbl&dl=0' },
     { videoUrl: 'https://cdn.videy.co/1S2HTGaf1.mp4' } // Video baru dari cdn.videy.co
   ];
 

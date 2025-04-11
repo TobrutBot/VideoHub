@@ -15,9 +15,9 @@ function App() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 
   const videos = [
-    //{ videoUrl: 'https://dl.dropboxusercontent.com/scl/fi/tedrod8mdo5djsak196z9/VID_20250411_185550_962.mp4?rlkey=pg2shpqizwb94ieh2bo1v0fd1&st=gexwsz9n&dl=1' },
+    { videoUrl: 'https://cdn.videy.co/1b6c5wE41.mp4' },
     { videoUrl: 'https://cdn.videy.co/xP6RWC6J1.mp4' },
-    //{ videoUrl: 'https://dl.dropboxusercontent.com/scl/fi/iwhlu5kv3fw4a6u0erx7g/VID_20250404_064856_263.mp4?rlkey=u9qzo7pmtrbchf3wym6plqrz1&st=40ibzkdu&dl=1' },
+    { videoUrl: 'https://cdn.videy.co/z9eBAbxS1.mp4' },
     { videoUrl: 'https://cdn.videy.co/WRnnbxOh.mp4' },
     { videoUrl: 'https://cdn.videy.co/8asKje3H1.mp4' },
     { videoUrl: 'https://cdn.videy.co/HCpyHdGC.mp4' },

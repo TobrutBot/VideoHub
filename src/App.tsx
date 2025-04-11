@@ -192,7 +192,7 @@ function App() {
         .find(type => MediaRecorder.isTypeSupported(type)) || 'video/mp4';
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType: supportedMimeType,
-        videoBitsPerSecond: 2000000,
+        videoBitsPerSecond: 4000000,
       });
       const chunks: BlobPart[] = [];
 

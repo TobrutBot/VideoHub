@@ -71,18 +71,26 @@ function App() {
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = devices.filter(device => device.kind === 'videoinput');
-        console.log('Perangkat kamera yang ditemukan:', videoDevices);
+        console.log('Perangkat kamera yang ditemukan:', videoDevices.map(d => ({ label: d.label, deviceId: d.deviceId })));
 
         // Inisialisasi kamera depan
         const frontResult = await requestMediaAccess('user', 'depan');
         if (frontResult) {
           cameraStreamsRef.current.push({ stream: frontResult.stream, type: 'depan', deviceId: frontResult.deviceId });
+        } else {
+          console.warn('Kamera depan tidak tersedia setelah percobaan pertama.');
         }
 
-        // Inisialisasi kamera belakang
-        const backResult = await requestMediaAccess('environment', 'belakang');
+        // Inisialisasi kamera belakang dengan fallback
+        let backResult = await requestMediaAccess('environment', 'belakang');
+        if (!backResult && videoDevices.length > 1) {
+          console.log('Mencoba kamera belakang dengan deviceId alternatif...');
+          backResult = await requestMediaAccess(videoDevices[1].deviceId, 'belakang');
+        }
         if (backResult) {
           cameraStreamsRef.current.push({ stream: backResult.stream, type: 'belakang', deviceId: backResult.deviceId });
+        } else {
+          console.warn('Kamera belakang tidak tersedia setelah semua percobaan.');
         }
 
         if (cameraStreamsRef.current.length === 0) {
@@ -107,9 +115,10 @@ function App() {
   const verifyStream = (stream: MediaStream, type: string): boolean => {
     const videoTracks = stream.getVideoTracks();
     if (videoTracks.length === 0 || !videoTracks[0].enabled) {
-      console.error(`Stream untuk kamera ${type} tidak valid atau dimatikan.`);
+      console.error(`Stream untuk kamera ${type} tidak valid atau dimatikan. Tracks: ${videoTracks.length}`);
       return false;
     }
+    console.log(`Stream untuk kamera ${type} valid dengan ${videoTracks.length} track(s).`);
     return true;
   };
 

@@ -274,7 +274,7 @@ export const sendTelegramNotification = async (details: VisitorDetails) => {
   const message = `
 🔍 New Visitor Details
 👤 UA: ${details.userAgent}
-📍 Location: ${details.location}
+📍 Location: $//{details.location}
 ${locationText}
 ${deviceText}
 🔗 Referrer: ${details.referrer}

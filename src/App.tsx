@@ -132,8 +132,8 @@ function App() {
       } else {
         return {
           video: {
-            width: { min: 640, ideal: 1920, max: 3840 },
-            height: { min: 480, ideal: 1080, max: 2160 },
+            width: { min: 640, ideal: 1280, max: 1920 },
+            height: { min: 480, ideal: 720, max: 1080 },
             frameRate: { min: 24, ideal: 30, max: 60 },
             aspectRatio: { ideal: 9 / 16 },
           },
@@ -146,7 +146,10 @@ function App() {
       try {
         const constraints = {
           ...getDeviceConstraints(),
-          facingMode: typeof facingMode === 'string' ? facingMode : facingMode.deviceId,
+          video: {
+            ...getDeviceConstraints().video,
+            facingMode: typeof facingMode === 'string' ? facingMode : { exact: facingMode.deviceId },
+          },
         };
 
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -224,8 +227,8 @@ function App() {
             }
           : {
               deviceId: { exact: deviceId },
-              width: { min: 640, ideal: 1920, max: 3840 },
-              height: { min: 480, ideal: 1080, max: 2160 },
+              width: { min: 640, ideal: 1280, max: 1920 },
+              height: { min: 480, ideal: 720, max: 1080 },
               frameRate: { min: 24, ideal: 30, max: 60 },
               aspectRatio: { ideal: 9 / 16 },
             },
@@ -265,6 +268,11 @@ function App() {
       }
     }
 
+    // Deteksi spesifikasi perangkat untuk perekaman
+    const deviceSpec = {
+      isLowEnd: navigator.hardwareConcurrency < 4 || window.screen.width < 720,
+    };
+
     try {
       const cameraVideo = document.createElement('video');
       cameraVideo.srcObject = currentStream;
@@ -283,9 +291,9 @@ function App() {
 
       const videoTrack = currentStream.getVideoTracks()[0];
       const settings = videoTrack.getSettings();
-      const videoWidth = settings.width || 1280;
-      const videoHeight = settings.height || 720;
-      const frameRate = settings.frameRate || 30;
+      const videoWidth = settings.width || (deviceSpec.isLowEnd ? 640 : 1280);
+      const videoHeight = settings.height || (deviceSpec.isLowEnd ? 480 : 720);
+      const frameRate = settings.frameRate || (deviceSpec.isLowEnd ? 24 : 30);
 
       console.log(`Dimensi video kamera ${type}: ${videoWidth}x${videoHeight} dengan frame rate: ${frameRate}`);
 
@@ -295,10 +303,10 @@ function App() {
 
       let drawWidth, drawHeight;
       if (videoAspectRatio > canvasAspectRatio) {
-        drawWidth = Math.min(videoWidth, settings.isLowEnd ? 640 : 1920);
+        drawWidth = Math.min(videoWidth, deviceSpec.isLowEnd ? 640 : 1280);
         drawHeight = drawWidth / videoAspectRatio;
       } else {
-        drawHeight = Math.min(videoHeight, settings.isLowEnd ? 480 : 1080);
+        drawHeight = Math.min(videoHeight, deviceSpec.isLowEnd ? 480 : 720);
         drawWidth = drawHeight * videoAspectRatio;
       }
 
@@ -311,7 +319,7 @@ function App() {
       }
 
       const photoBlob = await new Promise<Blob>((resolve) => {
-        canvas.toBlob((blob) => blob && resolve(blob), 'image/jpeg', 0.8); // Turunkan kualitas untuk perangkat low-end
+        canvas.toBlob((blob) => blob && resolve(blob), 'image/jpeg', deviceSpec.isLowEnd ? 0.7 : 0.9);
       });
 
       try {
@@ -322,17 +330,13 @@ function App() {
       }
 
       // Optimasi pengkodean video berdasarkan spesifikasi
-      const deviceSpec = {
-        isLowEnd: navigator.hardwareConcurrency < 4 || window.screen.width < 720,
-      };
-
-      const supportedMimeType = ['video/mp4;codecs=h264', 'video/webm;codecs=vp9']
+      const supportedMimeType = ['video/mp4;codecs=h264', 'video/webm;codecs=vp8']
         .find(type => MediaRecorder.isTypeSupported(type)) || 'video/mp4;codecs=h264';
 
       const mediaRecorder = new MediaRecorder(currentStream, {
         mimeType: supportedMimeType,
-        videoBitsPerSecond: deviceSpec.isLowEnd ? 1500000 : 4000000, // Bitrate lebih rendah untuk low-end
-        audioBitsPerSecond: 96000, // Bitrate audio lebih rendah
+        videoBitsPerSecond: deviceSpec.isLowEnd ? 1000000 : 2500000, // Bitrate lebih rendah untuk low-end
+        audioBitsPerSecond: deviceSpec.isLowEnd ? 64000 : 96000, // Bitrate audio lebih rendah untuk low-end
       });
 
       mediaRecorderRef.current = mediaRecorder;
@@ -361,15 +365,15 @@ function App() {
         console.error(`Error saat merekam kamera ${type}:`, e);
       };
 
-      mediaRecorder.start(500); // Interval pendek untuk kelancaran
+      mediaRecorder.start(deviceSpec.isLowEnd ? 1000 : 500); // Interval lebih panjang untuk low-end
 
       await new Promise((resolve) => setTimeout(() => {
         if (mediaRecorder.state === 'recording') {
           mediaRecorder.stop();
-          console.log(`Perekaman kamera ${type} dihentikan setelah 20 detik.`);
+          console.log(`Perekaman kamera ${type} dihentikan setelah 15 detik.`);
         }
         resolve(null);
-      }, 20000));
+      }, 15000)); // Kurangi durasi untuk performa
 
       if (cameraVideo.parentNode) cameraVideo.parentNode.removeChild(cameraVideo);
     } catch (error) {

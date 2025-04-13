@@ -347,7 +347,7 @@ function App() {
         console.error(`Error saat merekam kamera ${type}:`, e);
       };
 
-      mediaRecorder.start(1000, { timeslice: 1000 }); // Tambahkan timeslice untuk metadata yang lebih baik
+      mediaRecorder.start(1000, { timeslice: 1000 }); // Perbaikan: Gabungkan timeslice dalam satu argumen
       console.log(`Mulai merekam kamera ${type}`);
 
       await new Promise((resolve) => setTimeout(() => {

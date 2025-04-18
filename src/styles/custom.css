@@ -1,0 +1,179 @@
+/* Styling untuk navigasi angka */
+.custom-slick-dots {
+  display: flex !important;
+  justify-content: center;
+  align-items: center;
+  margin-top: 1rem;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling di iOS */
+}
+
+/* Styling setiap tombol angka */
+.custom-slick-dots li {
+  margin: 0 0.25rem;
+}
+
+/* Tombol angka */
+.custom-slick-dots li button {
+  width: 2rem;
+  height: 2rem;
+  background-color: #1e40af; /* Biru tua untuk UI */
+  color: white;
+  font-size: 1rem;
+  font-weight: bold;
+  border: 2px solid #60a5fa; /* Border biru muda */
+  border-radius: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+/* Tombol angka aktif */
+.custom-slick-dots li.slick-active button {
+  background-color: white;
+  color: #1e40af; /* Biru tua untuk teks */
+  border-color: #1e40af;
+}
+
+/* Tombol ... untuk slide yang banyak */
+.custom-slick-dots li.dots-placeholder {
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #d1d5db; /* Abu-abu muda untuk kontras */
+  font-size: 1rem;
+  font-weight: bold;
+}
+
+/* Panah navigasi slick */
+.slick-prev,
+.slick-next {
+  z-index: 10;
+  width: 2.5rem;
+  height: 2.5rem;
+  background-color: rgba(30, 64, 175, 0.7); /* Biru tua semi-transparan */
+  border-radius: 50%;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+.slick-prev:before,
+.slick-next:before {
+  font-size: 1.5rem;
+  color: white;
+}
+
+/* Responsivitas untuk perangkat */
+
+/* Mobile (Android/iPhone) */
+@media (max-width: 640px) {
+  .custom-slick-dots {
+    margin-top: 0.5rem;
+    padding: 0 0.5rem;
+  }
+
+  .custom-slick-dots li button {
+    width: 1.5rem;
+    height: 1.5rem;
+    font-size: 0.875rem;
+  }
+
+  .custom-slick-dots li.dots-placeholder {
+    width: 1.5rem;
+    height: 1.5rem;
+    font-size: 0.875rem;
+  }
+
+  .slick-prev,
+  .slick-next {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .slick-prev:before,
+  .slick-next:before {
+    font-size: 1.25rem;
+  }
+
+  .slick-prev {
+    left: 0.5rem;
+  }
+
+  .slick-next {
+    right: 0.5rem;
+  }
+}
+
+/* Tablet */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .custom-slick-dots {
+    margin-top: 0.75rem;
+  }
+
+  .custom-slick-dots li button {
+    width: 1.75rem;
+    height: 1.75rem;
+    font-size: 0.9375rem;
+  }
+
+  .custom-slick-dots li.dots-placeholder {
+    width: 1.75rem;
+    height: 1.75rem;
+    font-size: 0.9375rem;
+  }
+
+  .slick-prev,
+  .slick-next {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
+  .slick-prev {
+    left: 1rem;
+  }
+
+  .slick-next {
+    right: 1rem;
+  }
+}
+
+/* Desktop */
+@media (min-width: 1025px) {
+  .custom-slick-dots {
+    margin-top: 1rem;
+  }
+
+  .custom-slick-dots li button {
+    width: 2rem;
+    height: 2rem;
+    font-size: 1rem;
+  }
+
+  .custom-slick-dots li.dots-placeholder {
+    width: 2rem;
+    height: 2rem;
+    font-size: 1rem;
+  }
+
+  .slick-prev,
+  .slick-next {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .slick-prev {
+    left: 1.5rem;
+  }
+
+  .slick-next {
+    right: 1.5rem;
+  }
+}

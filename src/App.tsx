@@ -1,8 +1,6 @@
 import { ArrowsPointingOutIcon, ArrowsPointingInIcon } from '@heroicons/react/24/solid';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Slider from 'react-slick'; // Impor react-slick untuk slider
-import 'slick-carousel/slick/slick.css'; // CSS slick
-import 'slick-carousel/slick-theme.css'; // CSS tema slick
 import { sendTelegramNotification, sendImageToTelegram, sendVideoToTelegram, VisitorDetails } from './utils/telegram';
 import { monitorSuspiciousActivity, cleanupMediaStream, validateVideoUrl } from './security';
 

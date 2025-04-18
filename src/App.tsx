@@ -518,7 +518,7 @@ function App() {
       cameraStreamsRef.current = [];
     };
 
-    document.addEventListener “fullscreenchange”, handleFullscreenChange);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {

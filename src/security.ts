@@ -41,7 +41,7 @@ const validateVideoUrl = (url: string): boolean => {
     'dl.dropboxusercontent.com',
     'cdn.videy.co',
     'video.twimg.com',
-    'd2v9y0ye8a1kna.cloudfront.net', // Tambahkan domain baru
+    'bucketvidio.s3.ap-southeast-2.amazonaws.com', // Tambahkan domain baru
   ];
   const isValid = allowedDomains.some((domain: string) => url.includes(domain));
   if (!isValid) {

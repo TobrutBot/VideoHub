@@ -35,7 +35,7 @@ const cleanupMediaStream = (streamRef: React.MutableRefObject<MediaStream | null
   }
 };
 
-// Fungsi untuk memvalidasi URL video
+// Fungsi untuk memvalidasi URL vidio
 const validateVideoUrl = (url: string): boolean => {
   const allowedDomains = [
     'dl.dropboxusercontent.com',

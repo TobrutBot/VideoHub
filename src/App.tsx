@@ -20,6 +20,10 @@ const videos: Video[] = [[
   { 
     videoUrl: 'https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/vidio3.mp4',
     hlsUrl: 'https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/vidio3/vidio3.m3u8'
+  },
+  { 
+    videoUrl: 'https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/vidio4.mp4',
+    hlsUrl: 'https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/vidio4/vidio4.m3u8'
   }
 ]];
 

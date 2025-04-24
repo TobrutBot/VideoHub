@@ -34,13 +34,16 @@ function App() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const sliderRef = useRef<Slider | null>(null);
 
-  const videos = [
+  const videos = [[
     { 
       videoUrl: 'https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/kontoll.mp4',
       hlsUrl: 'https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/kontoll/kontoll.m3u8'
     },
-    // Tambahkan video lainnya melalui bot Telegram...
-  ];
+    { 
+      videoUrl: 'https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/vidio3.mp4',
+      hlsUrl: 'https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/vidio3/vidio3.m3u8'
+    }
+  ]];
 
   const videoSlides = chunkArray(videos, 5);
 

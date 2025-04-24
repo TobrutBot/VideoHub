@@ -55,7 +55,7 @@ function App() {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
             const slideIndex = parseInt(entry.target.getAttribute('data-slide-index') || '0', 10);
-            if (!proportionateSlides.includes(slideIndex)) {
+            if (!loadedSlides.includes(slideIndex)) { // Perbaikan: proportionateSlides -> loadedSlides
               console.log(`Memuat slide: ${slideIndex}`);
               setLoadedSlides((prev) => [...prev, slideIndex]);
             }

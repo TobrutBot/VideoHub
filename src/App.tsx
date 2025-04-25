@@ -15,8 +15,7 @@ interface Video {
 const videos: Video[] = [
   { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/kontoll.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/kontoll/kontoll.m3u8" },
   { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/vidio1.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/vidio1/vidio1.m3u8" },
-  { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/teskntol.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/teskntol/teskntol.m3u8" },
-  { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/testdoang.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/testdoang/testdoang.m3u8" }
+  { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/teskntol.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/teskntol/teskntol.m3u8" }
 ];
 
 // Fungsi untuk membagi array video menjadi kelompok 5 untuk slide

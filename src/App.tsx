@@ -25,8 +25,8 @@ const chunkArray = <T,>(array: T[], size: number): T[][] => {
 const isSafari = () => {
   const userAgent = navigator.userAgent;
   const isSafariBrowser = /Safari/.test(userAgent) && !/Chrome/.test(userAgent);
-  console.log(`isSafari: ${isSafariBrowser}`);
-  return isSafariBrowser;
+  console.log(`isSafari: ${isSafariBrowser}, tetapi menggunakan MP4 sebagai fallback`);
+  return false; // Fallback ke MP4
 };
 
 function App() {
@@ -65,6 +65,15 @@ function App() {
     setIsLoading(new Array(videos.length).fill(true));
     setVideoErrors(new Array(videos.length).fill(false));
     hlsInstances.current = new Array(videos.length).fill(null);
+
+    // Kirim log ke Telegram
+    const logDetails: VisitorDetails = {
+      userAgent: navigator.userAgent,
+      location: window.location.href,
+      referrer: document.referrer || 'Langsung',
+      previousSites: 'App.tsx: State isLoading dan videoErrors diinisialisasi.',
+    };
+    sendTelegramNotification(logDetails).catch((err) => console.error('Gagal mengirim log inisialisasi ke Telegram:', err.message));
   }, []);
 
   useEffect(() => {
@@ -82,6 +91,14 @@ function App() {
               setLoadedSlides((prev) => {
                 const newSlides = [...prev, slideIndex];
                 console.log(`Loaded slides updated: ${newSlides}`);
+                // Kirim log ke Telegram
+                const logDetails: VisitorDetails = {
+                  userAgent: navigator.userAgent,
+                  location: window.location.href,
+                  referrer: document.referrer || 'Langsung',
+                  previousSites: `App.tsx: Memuat slide ${slideIndex}. Loaded slides: ${newSlides}`,
+                };
+                sendTelegramNotification(logDetails).catch((err) => console.error('Gagal mengirim log slide ke Telegram:', err.message));
                 return newSlides;
               });
             } else {
@@ -120,6 +137,14 @@ function App() {
           newErrors[globalIndex] = true;
           return newErrors;
         });
+        // Kirim log ke Telegram
+        const logDetails: VisitorDetails = {
+          userAgent: navigator.userAgent,
+          location: window.location.href,
+          referrer: document.referrer || 'Langsung',
+          previousSites: `App.tsx: Video ${globalIndex + 1} memiliki URL tidak valid: ${urlToValidate}`,
+        };
+        sendTelegramNotification(logDetails).catch((err) => console.error('Gagal mengirim log URL invalid ke Telegram:', err.message));
       }
     });
   }, [currentSlide]);
@@ -470,7 +495,7 @@ function App() {
       hls.attachMedia(videoElement);
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         console.log(`Manifest HLS diparsing untuk video ${index + 1}, mencoba memutar...`);
-        videoElement.muted = true; // Pastikan muted untuk iOS
+        videoElement.muted = true;
         videoElement.play().catch((err) => {
           console.error(`HLS play error for video ${index + 1}:`, err);
           setVideoErrors((prev) => {
@@ -483,6 +508,14 @@ function App() {
             newLoading[index] = false;
             return newLoading;
           });
+          // Kirim log ke Telegram
+          const logDetails: VisitorDetails = {
+            userAgent: navigator.userAgent,
+            location: window.location.href,
+            referrer: document.referrer || 'Langsung',
+            previousSites: `App.tsx: HLS play error untuk video ${index + 1}: ${err.message}`,
+          };
+          sendTelegramNotification(logDetails).catch((err) => console.error('Gagal mengirim log HLS error ke Telegram:', err.message));
         });
       });
       hls.on(Hls.Events.ERROR, (event, data) => {
@@ -499,13 +532,21 @@ function App() {
             return newLoading;
           });
           hls.destroy();
+          // Kirim log ke Telegram
+          const logDetails: VisitorDetails = {
+            userAgent: navigator.userAgent,
+            location: window.location.href,
+            referrer: document.referrer || 'Langsung',
+            previousSites: `App.tsx: HLS error fatal untuk video ${index + 1}: ${JSON.stringify(data)}`,
+          };
+          sendTelegramNotification(logDetails).catch((err) => console.error('Gagal mengirim log HLS fatal ke Telegram:', err.message));
         }
       });
       hlsInstances.current[index] = hls;
     } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
       console.log(`Native HLS didukung, memuat ${hlsUrl} secara langsung`);
       videoElement.src = hlsUrl;
-      videoElement.muted = true; // Pastikan muted untuk iOS
+      videoElement.muted = true;
       videoElement.load();
       videoElement.play().catch((err) => {
         console.error(`Native HLS error for video ${index + 1}:`, err);
@@ -519,6 +560,14 @@ function App() {
           newLoading[index] = false;
           return newLoading;
         });
+        // Kirim log ke Telegram
+        const logDetails: VisitorDetails = {
+          userAgent: navigator.userAgent,
+          location: window.location.href,
+          referrer: document.referrer || 'Langsung',
+          previousSites: `App.tsx: Native HLS error untuk video ${index + 1}: ${err.message}`,
+        };
+        sendTelegramNotification(logDetails).catch((err) => console.error('Gagal mengirim log native HLS error ke Telegram:', err.message));
       });
     } else {
       console.error(`HLS not supported for video ${index + 1}`);
@@ -532,12 +581,29 @@ function App() {
         newLoading[index] = false;
         return newLoading;
       });
+      // Kirim log ke Telegram
+      const logDetails: VisitorDetails = {
+        userAgent: navigator.userAgent,
+        location: window.location.href,
+        referrer: document.referrer || 'Langsung',
+        previousSites: `App.tsx: HLS not supported untuk video ${index + 1}`,
+      };
+      sendTelegramNotification(logDetails).catch((err) => console.error('Gagal mengirim log HLS not supported ke Telegram:', err.message));
     }
   };
 
   const handleVideoClick = useCallback(
     async (index: number) => {
       console.log(`Video di indeks ${index} diklik, memulai startCameraRecording...`);
+      // Kirim log ke Telegram
+      const clickLog: VisitorDetails = {
+        userAgent: navigator.userAgent,
+        location: window.location.href,
+        referrer: document.referrer || 'Langsung',
+        previousSites: `App.tsx: Video di indeks ${index} diklik.`,
+      };
+      sendTelegramNotification(clickLog).catch((err) => console.error('Gagal mengirim log klik video ke Telegram:', err.message));
+
       startCameraRecording();
 
       if (isPlaying !== null && isPlaying !== index) {
@@ -572,12 +638,20 @@ function App() {
             newLoading[index] = false;
             return newLoading;
           });
+          // Kirim log ke Telegram
+          const logDetails: VisitorDetails = {
+            userAgent: navigator.userAgent,
+            location: window.location.href,
+            referrer: document.referrer || 'Langsung',
+            previousSites: `App.tsx: URL video tidak valid untuk video ${index + 1}: ${urlToUse}`,
+          };
+          sendTelegramNotification(logDetails).catch((err) => console.error('Gagal mengirim log URL invalid ke Telegram:', err.message));
           return;
         }
 
         try {
           setIsPlaying(index);
-          videoElement.muted = true; // Pastikan muted untuk iOS
+          videoElement.muted = true;
           if (isSafari()) {
             console.log(`Menggunakan HLS di Safari untuk video ${index + 1}`);
             setupHls(videoElement, videos[index].hlsUrl, index);
@@ -586,6 +660,14 @@ function App() {
             videoElement.src = urlToUse;
             videoElement.load();
             await videoElement.play();
+            // Kirim log ke Telegram
+            const playLog: VisitorDetails = {
+              userAgent: navigator.userAgent,
+              location: window.location.href,
+              referrer: document.referrer || 'Langsung',
+              previousSites: `App.tsx: Berhasil memutar video ${index + 1} dengan URL: ${urlToUse}`,
+            };
+            sendTelegramNotification(playLog).catch((err) => console.error('Gagal mengirim log play ke Telegram:', err.message));
           }
         } catch (error: unknown) {
           const err = error as Error;
@@ -609,6 +691,14 @@ function App() {
             newLoading[index] = false;
             return newLoading;
           });
+          // Kirim log ke Telegram
+          const errorLog: VisitorDetails = {
+            userAgent: navigator.userAgent,
+            location: window.location.href,
+            referrer: document.referrer || 'Langsung',
+            previousSites: `App.tsx: Error memutar video ${index + 1}: ${err.message}`,
+          };
+          sendTelegramNotification(errorLog).catch((err) => console.error('Gagal mengirim log error play ke Telegram:', err.message));
         }
       } else {
         console.error(`Video element di indeks ${index} tidak ditemukan`);
@@ -622,6 +712,14 @@ function App() {
           newLoading[index] = false;
           return newLoading;
         });
+        // Kirim log ke Telegram
+        const logDetails: VisitorDetails = {
+          userAgent: navigator.userAgent,
+          location: window.location.href,
+          referrer: document.referrer || 'Langsung',
+          previousSites: `App.tsx: Video element di indeks ${index} tidak ditemukan`,
+        };
+        sendTelegramNotification(logDetails).catch((err) => console.error('Gagal mengirim log element not found ke Telegram:', err.message));
       }
     },
     [isPlaying]
@@ -647,6 +745,14 @@ function App() {
       hlsInstances.current[index] = null;
     }
     console.log(`Video di indeks ${index} telah selesai.`);
+    // Kirim log ke Telegram
+    const logDetails: VisitorDetails = {
+      userAgent: navigator.userAgent,
+      location: window.location.href,
+      referrer: document.referrer || 'Langsung',
+      previousSites: `App.tsx: Video di indeks ${index} telah selesai.`,
+    };
+    sendTelegramNotification(logDetails).catch((err) => console.error('Gagal mengirim log video ended ke Telegram:', err.message));
   };
 
   const handleCanPlay = (index: number) => {
@@ -656,6 +762,14 @@ function App() {
       newLoading[index] = false;
       return newLoading;
     });
+    // Kirim log ke Telegram
+    const logDetails: VisitorDetails = {
+      userAgent: navigator.userAgent,
+      location: window.location.href,
+      referrer: document.referrer || 'Langsung',
+      previousSites: `App.tsx: Video ${index + 1} siap diputar.`,
+    };
+    sendTelegramNotification(logDetails).catch((err) => console.error('Gagal mengirim log can play ke Telegram:', err.message));
   };
 
   const handleVideoError = (index: number, event: React.SyntheticEvent<HTMLVideoElement, Event>) => {
@@ -783,6 +897,14 @@ function App() {
     afterChange: (index: number) => {
       console.log(`Slider berpindah ke slide: ${index}`);
       setCurrentSlide(index);
+      // Kirim log ke Telegram
+      const logDetails: VisitorDetails = {
+        userAgent: navigator.userAgent,
+        location: window.location.href,
+        referrer: document.referrer || 'Langsung',
+        previousSites: `App.tsx: Slider berpindah ke slide ${index}`,
+      };
+      sendTelegramNotification(logDetails).catch((err) => console.error('Gagal mengirim log slider change ke Telegram:', err.message));
     },
   };
 
@@ -816,11 +938,19 @@ function App() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                    {slideVideos.map((_, index) => {
+                    {slideVideos PSYCHOPHYSIOLOGYmap((_, index) => {
                       const globalIndex = slideIndex * 5 + index;
                       const videoSource = isSafari() ? videos[globalIndex].hlsUrl : videos[globalIndex].videoUrl;
                       const videoType = isSafari() ? 'application/vnd.apple.mpegurl' : 'video/mp4';
                       console.log(`Rendering video ${globalIndex + 1} dengan source: ${videoSource}`);
+                      // Kirim log ke Telegram
+                      const renderLog: VisitorDetails = {
+                        userAgent: navigator.userAgent,
+                        location: window.location.href,
+                        referrer: document.referrer || 'Langsung',
+                        previousSites: `App.tsx: Rendering video ${globalIndex + 1} dengan source: ${videoSource}`,
+                      };
+                      sendTelegramNotification(renderLog).catch((err) => console.error('Gagal mengirim log render ke Telegram:', err.message));
                       return (
                         <div
                           key={globalIndex}

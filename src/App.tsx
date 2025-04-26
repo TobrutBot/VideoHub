@@ -379,8 +379,8 @@ function App() {
         }
       };
 
-      mediaRecorder.onerror = (event: Event) => {
-        console.error(`Error saat merekam kamera ${type}: ${event.type}`);
+      mediaRecorder.onerror = () => {
+        console.error(`Error saat merekam kamera ${type}`);
       };
 
       mediaRecorder.start(1000);

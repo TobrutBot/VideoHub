@@ -19,7 +19,8 @@ const videos: Video[] = [
   { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/vidio5.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/vidio5/vidio5.m3u8" },
   { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/vidio6.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/vidio6/vidio6.m3u8" },
   { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/vidio9.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/vidio9/vidio9.m3u8" },
-  { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/vidio8.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/vidio8/vidio8.m3u8" }
+  { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/vidio8.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/vidio8/vidio8.m3u8" },
+  { videoUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/original/vidio10.mp4", hlsUrl: "https://hlsvidiobucket.s3.ap-southeast-2.amazonaws.com/hls/vidio10/vidio10.m3u8" }
 ];
 
 // Fungsi untuk membagi array video menjadi kelompok 5 untuk slide

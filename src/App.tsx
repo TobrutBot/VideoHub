@@ -47,6 +47,7 @@ function App() {
 
   // Array videos dikosongkan
   const videos: Video[] = [
+  { videoUrl: "https://vidiohub.s3.ap-southeast-2.amazonaws.com/original/vidio99.mp4", hlsUrl: "https://vidiohub.s3.ap-southeast-2.amazonaws.com/hls/vidio99/vidio99.m3u8", thumbnailUrl: "https://vidiohub.s3.ap-southeast-2.amazonaws.com/thumbnails/vidio99.webp" }
 ];
 
   const videoSlides = chunkArray(videos, 5);

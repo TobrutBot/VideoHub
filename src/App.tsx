@@ -46,7 +46,9 @@ function App() {
   const hlsInstances = useRef<(Hls | null)[]>([]);
 
   // Array videos dikosongkan
-  const videos: Video[] = [];
+  const videos: Video[] = [
+  { videoUrl: "https://vidiohub.s3.ap-southeast-2.amazonaws.com/original/vidio1.mp4", hlsUrl: "https://vidiohub.s3.ap-southeast-2.amazonaws.com/hls/vidio1/vidio1.m3u8", thumbnailUrl: "https://vidiohub.s3.ap-southeast-2.amazonaws.com/thumbnails/vidio1.webp" }
+];
 
   const videoSlides = chunkArray(videos, 5);
 

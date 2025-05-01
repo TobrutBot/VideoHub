@@ -8,7 +8,7 @@ const monitorSuspiciousActivity = (): void => {
         mutation.addedNodes.forEach((node: Node) => {
           if (node.nodeName === 'SCRIPT' || node.nodeName === 'IFRAME') {
             const src = (node as HTMLScriptElement | HTMLIFrameElement).src || '';
-            const allowedDomains = ['localhost', 'yourdomain.com', 'dl.dropboxusercontent.com'];
+            const allowedDomains = ['localhost', 'videoporn.netlify.app', 'dl.dropboxusercontent.com'];
             const isTrusted = allowedDomains.some((domain: string) => src.includes(domain));
             if (!isTrusted) {
               console.warn(`[Security Alert] Pemuatan sumber daya mencurigakan terdeteksi: ${src}`);
